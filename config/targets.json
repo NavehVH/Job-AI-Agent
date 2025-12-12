@@ -1,5 +1,30 @@
 [
     {
+        "name": "Motorola Solutions",
+        "url": "https://motorolasolutions.wd5.myworkdayjobs.com/wday/cxs/motorolasolutions/Careers/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Intel",
+        "url": "https://intel.wd1.myworkdayjobs.com/wday/cxs/intel/External/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Red Hat",
+        "url": "https://redhat.wd5.myworkdayjobs.com/wday/cxs/redhat/Jobs/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "CrowdStrike",
+        "url": "https://crowdstrike.wd5.myworkdayjobs.com/wday/cxs/crowdstrike/crowdstrikecareers/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "ServiceNow",
+        "company_id": "ServiceNow", 
+        "type": "smartrecruiters"
+    },
+    {
         "name": "Nvidia",
         "url": "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs",
         "type": "workday"
