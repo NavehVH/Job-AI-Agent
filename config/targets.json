@@ -5,23 +5,33 @@
         "type": "workday"
     },
     {
+        "name": "Salesforce",
+        "url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/External_Career_Site/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Palo Alto Networks",
+        "company_id": "paloaltonetworks2", 
+        "type": "smartrecruiters"
+    },
+    {
         "name": "CyberArk",
         "company_id": "Cyberark1", 
         "type": "smartrecruiters"
     },
     {
         "name": "Western Digital",
-        "company_id": "westerndigital",
+        "company_id": "WesternDigital",
         "type": "smartrecruiters"
+    },
+    {
+        "name": "Applied Materials",
+        "url": "https://amat.wd1.myworkdayjobs.com/wday/cxs/amat/External/jobs",
+        "type": "workday"
     },
     {
         "name": "Dell",
         "url": "https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
-        "type": "workday"
-    },
-    {
-        "name": "Broadcom",
-        "url": "https://broadcom.wd1.myworkdayjobs.com/wday/cxs/broadcom/External_Career/jobs",
         "type": "workday"
     },
     {
@@ -30,8 +40,13 @@
         "type": "workday"
     },
     {
-        "name": "Applied Materials",
-        "url": "https://amat.wd1.myworkdayjobs.com/wday/cxs/amat/External/jobs",
+        "name": "Broadcom",
+        "url": "https://broadcom.wd1.myworkdayjobs.com/wday/cxs/broadcom/External_Career/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Autodesk",
+        "url": "https://autodesk.wd1.myworkdayjobs.com/wday/cxs/autodesk/Ext/jobs",
         "type": "workday"
     }
 ]
