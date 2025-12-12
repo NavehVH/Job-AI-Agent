@@ -1,5 +1,5 @@
 import json
-from src.fetchers import WorkdayFetcher
+from src.fetchers import Fetcher
 from src.storage import JobStorage
 
 # We do NOT import JobBrain because we aren't using AI yet.
@@ -10,7 +10,7 @@ def load_targets():
 
 def main():
     targets = load_targets()
-    fetcher = WorkdayFetcher()
+    fetcher = Fetcher()
     storage = JobStorage()
     
     print("--- STARTING COLLECTOR MODE (NO AI, SAVING ALL) ---")

@@ -2,18 +2,36 @@
     {
         "name": "Nvidia",
         "url": "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs",
-        "type": "workday",
-        "payload": {
-            "locationHierarchy1": ["2f920f018751012330776b325d005e46"], 
-            "appliedFacets": {}
-        }
+        "type": "workday"
     },
     {
         "name": "CyberArk",
-        "url": "https://cyberark.wd1.myworkdayjobs.com/wday/cxs/cyberark/CyberArk_Careers/jobs",
-        "type": "workday",
-        "payload": {
-            "locationHierarchy1": ["50907a72670301010fd7c30623630000"]
-        }
+        "company_id": "Cyberark1", 
+        "type": "smartrecruiters"
+    },
+    {
+        "name": "Western Digital",
+        "company_id": "westerndigital",
+        "type": "smartrecruiters"
+    },
+    {
+        "name": "Dell",
+        "url": "https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Broadcom",
+        "url": "https://broadcom.wd1.myworkdayjobs.com/wday/cxs/broadcom/External_Career/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "HP",
+        "url": "https://hp.wd5.myworkdayjobs.com/wday/cxs/hp/ExternalCareerSite/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Applied Materials",
+        "url": "https://amat.wd1.myworkdayjobs.com/wday/cxs/amat/External/jobs",
+        "type": "workday"
     }
 ]
