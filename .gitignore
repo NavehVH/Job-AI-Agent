@@ -1,0 +1,10 @@
+# --- Security (NEVER UPLOAD THESE) ---
+openai_key.txt
+.env
+
+# --- Python System Files (Junk) ---
+__pycache__/
+*.pyc
+venv/
+.pytest_cache/
+.vscode/
