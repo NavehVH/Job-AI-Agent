@@ -17,7 +17,7 @@ class Fetcher:
             return GreenhouseFetcher().fetch(target_config)
         elif fetcher_type == 'comeet':
             return ComeetFetcher().fetch(target_config)
-        elif fetcher_type == 'lever':      # <--- NEW LOGIC
+        elif fetcher_type == 'lever':
             return LeverFetcher().fetch(target_config)
         elif fetcher_type == 'jobspy':
             return JobSpyFetcher().fetch(target_config)

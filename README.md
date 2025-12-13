@@ -1,6 +1,6 @@
 # AI Agent Job Hunter
 
-An AI agent for automated job search. Still working on it and adding ideas. 
+An AI agent for automated job search. Still working on it and adding ideas.
 This tool scans major tech company career sites for Junior / Student positions in Israel, or any role type you configure.
 
 The project is designed to solve the "Junior Problem": endless scrolling through career sites only to discover roles that secretly require years of experience.
@@ -8,6 +8,10 @@ The project is designed to solve the "Junior Problem": endless scrolling through
 The agent fetches job data from multiple platforms, filters strictly for Israel, and uses OpenAI gpt-4o-mini to analyze the actual job description (not just the title) in order to decide whether a role is truly entry-level and worth notifying about.
 
 ---
+
+## Next steps to add to this project
+Right now we get data from around 40 companies and ability to read linkedin 24 last hours posts. The next phase focuses on transforming the sequential data collector into a robust, high-performance, and cost-efficient AI agent. This involves transitioning to a multi-threaded architecture consisting of four distinct fetcher/analysis threads to maximize concurrency and bypass platform limitations (Workday heavy load, JobSpy delays). To ensure cost-efficiency, we will implement Pre-Database Filtering (simple text checks for senior-level keywords like 'VP', 'Director', 'בכיר') to discard irrelevant jobs before they are stored and processed. The core goal is the creation and integration of the AI Brain, which will use the OpenAI API to perform the final, sophisticated junior/seniority classification. Following this, the agent will gain a professional UI Dashboard to display the most relevant classified jobs and an integrated Notification System to alert the user immediately upon a highly-relevant job being posted.
+
 
 ## Features
 
