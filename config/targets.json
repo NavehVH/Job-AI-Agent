@@ -1,5 +1,164 @@
 [
     {
+        "name": "Aggregator: General Junior",
+        "type": "jobspy",
+        "sites": ["linkedin", "glassdoor"],
+        "search_term": "Junior Software Engineer",
+        "location": "Israel",
+        "limit": 15
+    },
+    {
+        "name": "Aggregator: Student Positions (Strict)",
+        "type": "jobspy",
+        "sites": ["linkedin", "glassdoor"],
+        "search_term": "Software Developer",
+        "job_type": "internship", 
+        "location": "Israel",
+        "limit": 15
+    },
+    {
+        "name": "Aggregator: Part-Time (Students)",
+        "type": "jobspy",
+        "sites": ["linkedin"],
+        "search_term": "Software Developer",
+        "job_type": "parttime", 
+        "location": "Israel",
+        "limit": 10
+    },
+    {
+        "name": "Aggregator: Dragnet (Hidden Juniors)",
+        "type": "jobspy",
+        "sites": ["linkedin", "glassdoor"],
+        "search_term": "Software Engineer",
+        "location": "Israel",
+        "limit": 30
+    },
+    {
+        "name": "Aggregator: Full Stack (Broad)",
+        "type": "jobspy",
+        "sites": ["linkedin"],
+        "search_term": "Full Stack Developer",
+        "location": "Israel",
+        "limit": 20
+    },
+    {
+        "name": "Glassbox",
+        "board_token": "glassboxltd",
+        "type": "greenhouse"
+    },
+    {
+        "name": "JFrog",
+        "board_token": "jfrog",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Redis",
+        "board_token": "redis",
+        "type": "greenhouse"
+    },
+    {
+        "name": "BigID",
+        "board_token": "bigid",
+        "type": "greenhouse"
+    },
+    {
+        "name": "At-Bay",
+        "board_token": "atbay",
+        "type": "greenhouse"
+    },
+    {
+        "name": "StreamElements",
+        "board_token": "streamelements",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Artlist",
+        "comeet_name": "artlist",
+        "comeet_uid": "85.003",
+        "type": "comeet"
+    },
+    {
+        "name": "Cato Networks",
+        "board_token": "catonetworks",
+        "type": "greenhouse"
+    },
+
+    {
+        "name": "Fiverr",
+        "comeet_name": "fiverr",
+        "comeet_uid": "60.002",
+        "type": "comeet"
+    },
+    {
+        "name": "Team8",
+        "comeet_name": "team8",
+        "comeet_uid": "61.003",
+        "type": "comeet"
+    },
+    {
+        "name": "Moon Active",
+        "comeet_name": "moonactive",
+        "comeet_uid": "a2.00c",
+        "type": "comeet"
+    },
+    {
+        "name": "Playstudios",
+        "comeet_name": "playstudios",
+        "comeet_uid": "E2.00B", 
+        "type": "comeet"
+    },
+    {
+        "name": "Arpeely",
+        "comeet_name": "arpeely",
+        "comeet_uid": "57.001",
+        "type": "comeet"
+    },
+    {
+        "name": "Riskified",
+        "board_token": "riskified",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Wiz",
+        "board_token": "wizinc",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Fireblocks",
+        "board_token": "fireblocks",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Melio",
+        "board_token": "melio",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Papaya Global",
+        "board_token": "papaya",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Lightricks",
+        "board_token": "lightricks",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Via",
+        "board_token": "via",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Yotpo",
+        "board_token": "yotpo",
+        "type": "greenhouse"
+    },
+    {
+        "name": "Taboola",
+        "board_token": "taboola",
+        "type": "greenhouse"
+    },
+    {
         "name": "Motorola Solutions",
         "url": "https://motorolasolutions.wd5.myworkdayjobs.com/wday/cxs/motorolasolutions/Careers/jobs",
         "type": "workday"
