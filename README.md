@@ -1,32 +1,61 @@
 # AI Agent Job Hunter
 
-An AI Agent for job search. Automated intelligent agent that scans major tech company career sites for Junior/Student positions in Israel or whatever role type you want to define it to search.
+An AI agent for automated job search. Still working on it and adding ideas. 
+This tool scans major tech company career sites for Junior / Student positions in Israel, or any role type you configure.
 
-This project is a Python-based tool designed to solve the "Junior Problem" (My current problem): endless scrolling through career sites only to find roles that require 0 years of experience.
+The project is designed to solve the "Junior Problem": endless scrolling through career sites only to discover roles that secretly require years of experience.
 
-The agent fetches jobs from multiple platforms (Workday, SmartRecruiters), filters strictly for Israel, and uses OpenAI's `gpt-4o-mini` to analyze the actual job description (not just the title) to determine whether a role is truly entry-level and send a notification.
+The agent fetches job data from multiple platforms, filters strictly for Israel, and uses OpenAI gpt-4o-mini to analyze the actual job description (not just the title) in order to decide whether a role is truly entry-level and worth notifying about.
+
+---
 
 ## Features
 
-### Multi-Platform Support
-Automatically adapts to different career site technologies:
-- Workday (Nvidia, Intel, Dell, etc.)
+### Multi-Platform and Comprehensive Coverage
+
+The agent adapts its fetching strategy to four different Applicant Tracking Systems (ATS) and aggregates results from job boards to provide a broad and realistic market view.
+
+#### Direct Company Sources (ATS)
+- Workday (Intel, Nvidia, Dell, etc.)
+- Greenhouse (Wiz, Riskified, Melio, etc.)
+- Comeet (Fiverr, Moon Active, Team8, etc.)
 - SmartRecruiters (CyberArk, Western Digital, etc.)
 
-### Smart Filtering
-- Location filtering: strict filtering for Israel (Tel Aviv, Haifa, Yokneam, etc.)
-- AI analysis: GPT reads the full job description
-- Deduplication: SQLite database ensures you are never notified twice about the same job
+#### Job Board Aggregation
+- Uses JobSpy to scan LinkedIn, Glassdoor, and similar boards for new jobs added in the last 24 hours
+- Helps detect so-called hidden junior roles from companies not explicitly targeted
+
+---
+
+### Intelligent Filtering and Analysis
+
+- AI-powered vetting: GPT reads the full job description and searches for experience indicators such as 0-2 years, new grad, student, or intern
+- Title override: misleading titles are ignored in favor of description-based analysis
+- Strict location filtering: only Israel-based roles are analyzed (Tel Aviv, Haifa, Yokneam, etc.)
+- Deduplication: an SQLite database ensures each job is stored only once, even if found via multiple sources
+
+---
 
 ### Performance and Architecture
-- Lazy loading: full job descriptions are fetched only for relevant Israel-based jobs
-- Modular design: new companies can be added easily via a JSON config file
+
+- Lazy loading: full job descriptions are fetched only for relevant Israel-based roles to reduce bandwidth and API usage
+- Modular design: adding a new company or source requires only a configuration change
+
+---
 
 ## Tech Stack
+
 - Language: Python 3.10+
-- Database: SQLite (zero-config, local)
-- AI Engine: OpenAI API (`gpt-4o-mini`)
-- Libraries: `requests`, `pydantic`, `sqlite3`
+- Database: SQLite (local, zero-configuration)
+- AI Engine: OpenAI API (gpt-4o-mini)
+- Libraries:
+  - requests
+  - pydantic
+  - sqlite3
+  - python-jobspy
+  - pandas
+
+---
 
 ## Installation
 
@@ -34,80 +63,84 @@ Automatically adapts to different career site technologies:
 
 ### 2) Install dependencies
 ```bash
-pip install requests openai pydantic
+pip install requests openai pydantic python-jobspy pandas
 ```
 
 ### 3) Set up OpenAI API key
-1. Get an API key from the OpenAI Platform
-2. Create a file named `openai_key.txt` in the project root
-3. Paste your key inside (single line, starts with `sk-`)
+1. Obtain an API key from the OpenAI Platform
+2. Create a file named openai_key.txt in the project root
+3. Paste your key inside (single line, starting with sk-)
 4. This file is git-ignored for security
+
+---
 
 ## Usage
 
 ### 1) Run the agent
-This starts the full pipeline:
-- fetch jobs
-- filter for Israel
-- analyze with AI
-- save results to the database
-
 ```bash
 python run_pipeline.py
 ```
 
 ### 2) View results
-All matches are saved to `jobs.db`.
-
-Using the SQLite CLI:
 ```bash
-sqlite3 jobs.db "SELECT company, title, location FROM jobs WHERE is_junior = 1;"
+sqlite3 jobs.db "SELECT company, title, location, url FROM jobs WHERE is_junior = 1;"
 ```
 
-You can also open the database using any SQLite GUI viewer.
+---
 
 ## Configuration
-To add more companies, edit:
+
+Edit:
 ```
 config/targets.json
 ```
 
-### Example: Workday company
+### Example: Greenhouse company
 ```json
 {
-  "name": "Intel",
-  "url": "https://intel.wd1.myworkdayjobs.com/wday/cxs/intel/External/jobs",
-  "type": "workday"
+  "name": "Wiz",
+  "board_token": "wizinc",
+  "type": "greenhouse"
 }
 ```
 
-### Example: SmartRecruiters company
+### Example: Job board aggregation
 ```json
 {
-  "name": "CyberArk",
-  "company_id": "Cyberark1",
-  "type": "smartrecruiters"
+  "name": "Aggregator: Broad Search",
+  "type": "jobspy",
+  "sites": ["linkedin", "glassdoor"],
+  "search_term": "Software Engineer",
+  "location": "Israel",
+  "limit": 30
 }
 ```
+
+---
 
 ## Project Structure
+
 ```
 .
 ├── config/
-│   └── targets.json        # List of companies to scan
+│   └── targets.json
 ├── src/
 │   ├── fetchers/
-│   │   ├── __init__.py     # Factory / router
-│   │   ├── base.py         # Abstract base class
+│   │   ├── __init__.py
 │   │   ├── workday.py
-│   │   └── smartrecruiters.py
-│   ├── brain.py            # OpenAI integration
-│   └── storage.py          # SQLite database layer
-├── run_pipeline.py         # Main entry point
-├── jobs.db                 # Local database (auto-created)
-└── openai_key.txt          # OpenAI API key (git-ignored)
+│   │   ├── greenhouse.py
+│   │   ├── comeet.py
+│   │   └── jobspy_aggr.py
+│   ├── brain.py
+│   └── storage.py
+├── run_pipeline.py
+├── jobs.db
+└── openai_key.txt
 ```
 
+---
+
 ## License
-This project is open-source.
+
+This project is open-source.  
 Feel free to fork, extend, and help the junior developer community.
