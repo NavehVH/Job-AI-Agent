@@ -58,6 +58,31 @@
         "limit": 10
     },
     {
+        "name": "Autodesk",
+        "url": "https://autodesk.wd1.myworkdayjobs.com/wday/cxs/autodesk/Ext/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Dell",
+        "url": "https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Applied Materials",
+        "url": "https://amat.wd1.myworkdayjobs.com/wday/cxs/amat/External/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Broadcom",
+        "url": "https://broadcom.wd1.myworkdayjobs.com/wday/cxs/broadcom/External_Career/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Red Hat",
+        "url": "https://redhat.wd5.myworkdayjobs.com/wday/cxs/redhat/Jobs/jobs",
+        "type": "workday"
+    },
+    {
         "name": "Nvidia",
         "url": "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs",
         "type": "workday"

@@ -3,6 +3,7 @@ import time
 import threading
 import queue
 import requests
+import os
 from src.fetchers import Fetcher
 from src.storage import JobStorage
 
@@ -20,44 +21,51 @@ def database_worker():
         
         if not storage.job_exists(job['id']):
             try:
+                # Keep your description fetcher for Workday jobs
                 headers = {"Accept": "application/json", "X-Workday-Subdomain": job.get('tenant_id', '')}
                 desc_url = job.get('description_url')
                 if desc_url:
                     resp = session.get(desc_url, headers=headers, timeout=10)
                     if resp.status_code == 200:
                         job['description'] = resp.json().get('jobPostingInfo', {}).get('jobDescription', '')
+                
                 storage.save_job(job)
                 print(f"    [SAVED] {job['title'][:40]:<40} | {source} ✅", flush=True)
             except Exception as e:
                 print(f"    [!] Error saving {job['title']}: {e}")
-        else:
-            # We skip duplicates to keep the DB clean
-            job_queue.task_done()
-            continue
+        
         job_queue.task_done()
+
+def fast_scraper_worker(targets, fetcher):
+    """Bridge for Greenhouse, Comeet, etc. to talk to the Database Worker."""
+    for target in targets:
+        try:
+            print(f"[*] Fetching jobs for {target['name']}...", flush=True)
+            jobs = fetcher.fetch(target) # This calls the specific Greenhouse/Comeet fetcher
+            if jobs:
+                for job in jobs:
+                    # WE MUST PUT THE JOBS IN THE QUEUE HERE
+                    job_queue.put((job, target['name']))
+        except Exception as e:
+            print(f"    [!] Fast Scraper Error for {target['name']}: {e}")
 
 def round_robin_scraper(targets, fetcher):
     if not targets: return
-    offset = 0
-    limit = 20
+    offset, limit = 0, 20
     active_targets = list(targets)
     target_totals = {t['name']: 0 for t in targets}
     last_seen_ids = {t['name']: [] for t in targets}
 
     while active_targets and offset < 2000:
         print(f"\n[WORKDAY WAVE] Offset {offset} | Active Sites: {len(active_targets)}", flush=True)
-        
         finished_this_wave = []
         for target in active_targets:
             found_jobs, has_more, total_count = fetcher.workday.fetch_single_batch(target, offset)
             
-            if offset == 0:
-                target_totals[target['name']] = total_count
+            if offset == 0: target_totals[target['name']] = total_count
 
-            # LOOP PROTECTION
             current_ids = [j['id'] for j in found_jobs]
             if current_ids and current_ids == last_seen_ids.get(target['name']):
-                print(f"    [!] {target['name']} repeating data. Ending site scan.", flush=True)
                 finished_this_wave.append(target)
                 continue
             last_seen_ids[target['name']] = current_ids
@@ -67,9 +75,7 @@ def round_robin_scraper(targets, fetcher):
                 for job in found_jobs:
                     job_queue.put((job, target['name']))
 
-            # MATH PAGINATION: Keep going as long as the offset hasn't reached the Total matches
             if (offset + limit) >= target_totals[target['name']]:
-                print(f"    [-] {target['name']} reached end of {target_totals[target['name']]} matches.", flush=True)
                 finished_this_wave.append(target)
             
             time.sleep(0.5) 
@@ -86,19 +92,20 @@ def main():
     workday_targets = [t for t in targets if t.get('type') == 'workday']
     fast_targets = [t for t in targets if t.get('type') not in ['workday', 'jobspy']]
 
+    # 1. Start DB Worker
     consumer = threading.Thread(target=database_worker, daemon=True)
     consumer.start()
 
+    # 2. Start Both Scraping Branches
     threads = [
         threading.Thread(target=round_robin_scraper, args=(workday_targets, fetcher)),
-        threading.Thread(target=threading.Thread(target=lambda: [fetcher.fetch(t) for t in fast_targets]).start())
+        threading.Thread(target=fast_scraper_worker, args=(fast_targets, fetcher)) # Cleaned up threading
     ]
 
-    for t in threads: 
-        if t: t.start()
-    for t in threads: 
-        if t: t.join()
+    for t in threads: t.start()
+    for t in threads: t.join()
 
+    # 3. Shutdown
     job_queue.join()
     job_queue.put(None)
     consumer.join()
