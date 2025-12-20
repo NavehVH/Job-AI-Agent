@@ -10,7 +10,7 @@ The agent fetches job data from multiple platforms, filters strictly for Israel,
 ---
 
 ## Next steps to add to this project
-Right now we get data from around 40 companies and ability to read linkedin 24 last hours posts. The next phase focuses on transforming the sequential data collector into a robust, high-performance, and cost-efficient AI agent. This involves transitioning to a multi-threaded architecture consisting of four distinct fetcher/analysis threads to maximize concurrency and bypass platform limitations (Workday heavy load, JobSpy delays). To ensure cost-efficiency, we will implement Pre-Database Filtering (simple text checks for senior-level keywords like 'VP', 'Director', 'בכיר') to discard irrelevant jobs before they are stored and processed. The core goal is the creation and integration of the AI Brain, which will use the OpenAI API to perform the final, sophisticated junior/seniority classification. Following this, the agent will gain a professional UI Dashboard to display the most relevant classified jobs and an integrated Notification System to alert the user immediately upon a highly-relevant job being posted.
+Style and edit the UI forntend to work with the current pipleline, add email notifications and add the AI brain to the pipeline.
 
 
 ## Features
@@ -34,7 +34,6 @@ The agent adapts its fetching strategy to four different Applicant Tracking Syst
 ### Intelligent Filtering and Analysis
 
 - AI-powered vetting: GPT reads the full job description and searches for experience indicators such as 0-2 years, new grad, student, or intern
-- Title override: misleading titles are ignored in favor of description-based analysis
 - Strict location filtering: only Israel-based roles are analyzed (Tel Aviv, Haifa, Yokneam, etc.)
 - Deduplication: an SQLite database ensures each job is stored only once, even if found via multiple sources
 
