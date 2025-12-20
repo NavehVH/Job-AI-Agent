@@ -42,6 +42,11 @@
         "limit": 10
     },
     {
+        "name": "Red Hat",
+        "url": "https://redhat.wd5.myworkdayjobs.com/wday/cxs/redhat/Jobs/jobs",
+        "type": "workday"
+    },
+    {
         "name": "Nvidia",
         "url": "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/NVIDIAExternalCareerSite/jobs",
         "type": "workday"
@@ -59,11 +64,6 @@
     {
         "name": "Intel",
         "url": "https://intel.wd1.myworkdayjobs.com/wday/cxs/intel/External/jobs",
-        "type": "workday"
-    },
-    {
-        "name": "Red Hat",
-        "url": "https://redhat.wd5.myworkdayjobs.com/wday/cxs/redhat/Jobs/jobs",
         "type": "workday"
     },
     {

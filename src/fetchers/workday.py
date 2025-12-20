@@ -4,34 +4,34 @@ from .base import BaseFetcher
 
 class WorkdayFetcher(BaseFetcher):
     def __init__(self):
-        # Base headers - will be merged with dynamic ones in fetch()
         self.base_headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
 
+    # --- ADD THIS METHOD BACK ---
     def fetch(self, target_config):
-        print(f"[*] Fetching jobs for {target_config['name']} (Workday)...")
-        all_jobs = []
-        offset = 0
+        """
+        Satisfies the BaseFetcher requirement. 
+        You can leave this empty or call your batch logic for a single crawl.
+        """
+        # For now, we'll just return the first page if called normally
+        jobs, _ = self.fetch_single_batch(target_config, 0)
+        return jobs
+
+    def fetch_single_batch(self, target_config, offset):
+        """Your new Round-Robin logic"""
         limit = 20
+        all_batch_jobs = []
         
         try:
-            # 1. Extract Tenant ID (e.g., 'NVIDIAExternalCareerSite') from the URL
             tenant_id = target_config['url'].split('/cxs/')[1].split('/')[0]
             base_api_url = target_config['url'].replace("/jobs", "")
-        except IndexError:
-            print(f"[!] Error: Could not extract Workday Tenant ID from URL for {target_config['name']}.")
-            return []
+            
+            dynamic_headers = self.base_headers.copy()
+            dynamic_headers["X-Workday-Subdomain"] = tenant_id 
 
-        # 2. Define dynamic headers using the Tenant ID
-        dynamic_headers = self.base_headers.copy()
-        # --- CRITICAL FIX: Add the Workday X-Workday-Subdomain header ---
-        dynamic_headers["X-Workday-Subdomain"] = tenant_id 
-        
-        while True:
-            # 3. Define payload with mandatory Workday service keys
             payload = {
                 "appliedFacets": {}, 
                 "limit": limit, 
@@ -40,62 +40,39 @@ class WorkdayFetcher(BaseFetcher):
                 "subdomain": tenant_id,
                 "serviceName": "Public_Search_Service" 
             }
+
+            response = requests.post(target_config['url'], json=payload, headers=dynamic_headers, timeout=15)
             
-            if "payload" in target_config:
-                payload.update(target_config["payload"])
+            if response.status_code != 200:
+                return [], False 
+            
+            data = response.json()
+            if "jobPostings" not in data or not data["jobPostings"]:
+                return [], False 
+                
+            batch = data["jobPostings"]
+            relevant_batch = [j for j in batch if "Israel" in j.get('locationsText', '')]
 
-            try:
-                # 4. Make the POST request
-                response = requests.post(target_config['url'], json=payload, headers=dynamic_headers)
+            for job in relevant_batch:
+                job_obj = {
+                    "company": target_config["name"],
+                    "title": job.get("title"),
+                    "location": job.get("locationsText"),
+                    "posted_on": job.get("postedOn"),
+                    "url": f"{target_config['url'].split('/wday')[0]}{job.get('externalPath')}",
+                    "id": job.get("bulletFields", [None])[0] or job.get('externalPath'),
+                    "tenant_id": tenant_id # Added for the consumer to use
+                }
                 
-                if response.status_code != 200: 
-                    print(f"    [!] Workday HTTP Error {response.status_code}. Status text: {response.text[:50]}...")
-                    break
+                slug = job.get('externalPath')
+                if slug:
+                    job_obj['description_url'] = base_api_url + slug
+                    # Note: We are NO LONGER fetching description here 
+                    # so the Round-Robin stays lightning fast.
                 
-                try:
-                    data = response.json()
-                except:
-                    # JSON Decode Error usually means Workday returned an HTML/Text error page
-                    print(f"    [!] Workday JSON Decode Error for {target_config['name']}. Likely a blocked request.")
-                    break
-                    
-                if "jobPostings" not in data or not data["jobPostings"]: break
-                batch = data["jobPostings"]
-                
-                # Filter for Israel
-                relevant_batch = [j for j in batch if "Israel" in j.get('locationsText', '')]
-                
-                print(f"    -> Offset {offset}: Scanned {len(batch)} | Kept {len(relevant_batch)} (Israel)")
+                all_batch_jobs.append(job_obj)
+            
+            return all_batch_jobs, len(batch) == limit
 
-                for job in relevant_batch:
-                    job_obj = {
-                        "company": target_config["name"],
-                        "title": job.get("title"),
-                        "location": job.get("locationsText"),
-                        "posted_on": job.get("postedOn"),
-                        "url": f"{target_config['url'].split('/wday')[0]}{job.get('externalPath')}",
-                        "id": job.get("bulletFields", [None])[0] 
-                    }
-                    
-                    slug = job.get('externalPath')
-                    if slug:
-                         job_obj['description'] = self._fetch_description(base_api_url + slug, dynamic_headers)
-                    all_jobs.append(job_obj)
-                
-                if offset > 80: break
-                offset += limit
-                time.sleep(0.5) # Polite delay
-                
-            except Exception as e:
-                print(f"[!] Critical Error fetching {target_config['name']}: {e}")
-                break
-        return all_jobs
-
-    # NOTE: Updated to accept dynamic_headers for consistency
-    def _fetch_description(self, url, headers): 
-        try:
-            r = requests.get(url, headers=headers)
-            # The description endpoint is often more relaxed, but we use the same headers for safety
-            return r.json().get('jobPostingInfo', {}).get('jobDescription', 'No desc')
-        except:
-            return "Error"
+        except Exception:
+            return [], False
