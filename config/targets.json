@@ -2,7 +2,11 @@
     {
         "name": "Aggregator: General Junior",
         "type": "jobspy",
-        "sites": ["linkedin", "glassdoor", "google"],
+        "sites": [
+            "linkedin",
+            "glassdoor",
+            "google"
+        ],
         "search_term": "Junior Software Engineer",
         "location": "Israel",
         "limit": 15
@@ -10,25 +14,34 @@
     {
         "name": "Aggregator: Student Positions (Strict)",
         "type": "jobspy",
-        "sites": ["linkedin", "glassdoor"], 
+        "sites": [
+            "linkedin",
+            "glassdoor"
+        ],
         "search_term": "Software Developer",
-        "job_type": "internship", 
+        "job_type": "internship",
         "location": "Israel",
         "limit": 15
     },
     {
         "name": "Aggregator: Part-Time (Students)",
         "type": "jobspy",
-        "sites": ["linkedin"],
+        "sites": [
+            "linkedin"
+        ],
         "search_term": "Software Developer",
-        "job_type": "parttime", 
+        "job_type": "parttime",
         "location": "Israel",
         "limit": 10
     },
     {
         "name": "Aggregator: Dragnet (Hidden Juniors)",
         "type": "jobspy",
-        "sites": ["linkedin", "glassdoor", "google"], 
+        "sites": [
+            "linkedin",
+            "glassdoor",
+            "google"
+        ],
         "search_term": "Software Engineer",
         "location": "Israel",
         "limit": 15
@@ -36,10 +49,33 @@
     {
         "name": "Aggregator: Full Stack (Broad)",
         "type": "jobspy",
-        "sites": ["linkedin", "google"],
+        "sites": [
+            "linkedin",
+            "google"
+        ],
         "search_term": "Full Stack Developer",
         "location": "Israel",
         "limit": 10
+    },
+    {
+        "name": "Autodesk",
+        "url": "https://autodesk.wd1.myworkdayjobs.com/wday/cxs/autodesk/Ext/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Dell",
+        "url": "https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Applied Materials",
+        "url": "https://amat.wd1.myworkdayjobs.com/wday/cxs/amat/External/jobs",
+        "type": "workday"
+    },
+    {
+        "name": "Broadcom",
+        "url": "https://broadcom.wd1.myworkdayjobs.com/wday/cxs/broadcom/External_Career/jobs",
+        "type": "workday"
     },
     {
         "name": "Red Hat",
@@ -56,7 +92,7 @@
         "url": "https://salesforce.wd12.myworkdayjobs.com/wday/cxs/salesforce/External_Career_Site/jobs",
         "type": "workday"
     },
-     {
+    {
         "name": "Motorola Solutions",
         "url": "https://motorolasolutions.wd5.myworkdayjobs.com/wday/cxs/motorolasolutions/Careers/jobs",
         "type": "workday"
@@ -72,28 +108,8 @@
         "type": "workday"
     },
     {
-        "name": "Applied Materials",
-        "url": "https://amat.wd1.myworkdayjobs.com/wday/cxs/amat/External/jobs",
-        "type": "workday"
-    },
-    {
-        "name": "Dell",
-        "url": "https://dell.wd1.myworkdayjobs.com/wday/cxs/dell/External/jobs",
-        "type": "workday"
-    },
-    {
         "name": "HP",
         "url": "https://hp.wd5.myworkdayjobs.com/wday/cxs/hp/ExternalCareerSite/jobs",
-        "type": "workday"
-    },
-    {
-        "name": "Broadcom",
-        "url": "https://broadcom.wd1.myworkdayjobs.com/wday/cxs/broadcom/External_Career/jobs",
-        "type": "workday"
-    },
-    {
-        "name": "Autodesk",
-        "url": "https://autodesk.wd1.myworkdayjobs.com/wday/cxs/autodesk/Ext/jobs",
         "type": "workday"
     },
     {
