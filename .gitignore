@@ -8,3 +8,12 @@ __pycache__/
 venv/
 .pytest_cache/
 .vscode/*.deb
+
+
+dist/
+build/
+*.exe
+__pycache__/
+venv/
+jobs.db
+*.spec
