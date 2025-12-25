@@ -5,8 +5,9 @@ import sqlite3
 import math
 import subprocess
 import threading
-import signal
+import time
 from src.storage import JobStorage
+from src.notifications import send_job_email
 
 def main(page: ft.Page):
     # --- 1. WINDOW CONFIG ---
@@ -17,35 +18,43 @@ def main(page: ft.Page):
     page.window_height = 900
     page.padding = 0
 
-    # --- 2. DATABASE CONNECTION (Multi-Thread Safe) ---
+    # --- 2. DATABASE CONNECTION ---
     storage = JobStorage(db_path="jobs.db")
     storage.conn = sqlite3.connect("jobs.db", check_same_thread=False)
 
-    # --- 3. PERSISTENT "LAST SCAN" LOGIC ---
     def get_db_last_run():
         cursor = storage.conn.cursor()
         try:
             cursor.execute("SELECT MAX(found_at) FROM jobs")
             db_res = cursor.fetchone()[0]
             return db_res.split(" ")[1] if db_res else "Never"
-        except:
-            return "Never"
+        except: return "Never"
 
-    # --- 4. INITIALIZE STATE VARIABLES ---
+    # --- 3. STATE ---
     is_running = False
     is_auto_mode = False 
     email_enabled = True
-    user_email = "naveh@example.com"
+    user_email = "navehhadas@gmail.com"
     current_page = 0
     results_per_page = 10
     pipeline_process = None 
 
-    # --- 5. UI STATE COMPONENTS ---
+    # --- 4. UI COMPONENTS ---
     status_dot = ft.Container(width=10, height=10, bgcolor="#6A6A6A", border_radius=5)
     status_text = ft.Text("System Idle", color="#6A6A6A", size=12, weight="bold")
     last_run_label = ft.Text(f"Last Scan: {get_db_last_run()}", color="#B3B3B3", size=11)
     progress_ring = ft.ProgressRing(width=14, height=14, stroke_width=2, visible=False)
     page_number_text = ft.Text("Page 1 of 1", color="white", weight="bold")
+
+    # --- 5. LOGIC: AUTO-SCAN TIMER ---
+    def auto_scan_loop():
+        while True:
+            if is_auto_mode and not is_running:
+                on_run_click(None) 
+                time.sleep(1800)
+            time.sleep(10)
+
+    threading.Thread(target=auto_scan_loop, daemon=True).start()
 
     def get_time_ago(timestamp_str):
         try:
@@ -84,7 +93,7 @@ def main(page: ft.Page):
 
     job_list = ft.ListView(expand=True, spacing=15, padding=25)
 
-    # --- 7. DATA LOADING & PAGINATION ---
+    # --- 7. DATA LOADING ---
     def load_jobs_from_db(search_query=""):
         nonlocal current_page
         job_list.controls.clear()
@@ -121,17 +130,15 @@ def main(page: ft.Page):
             job_list.controls.append(create_job_card(job_dict, is_new))
         
         page_number_text.value = f"Page {current_page + 1} of {total_pages}"
-        prev_btn.disabled = (current_page == 0)
-        next_btn.disabled = (current_page + 1 >= total_pages)
+        prev_btn.disabled = (current_page == 0); next_btn.disabled = (current_page + 1 >= total_pages)
         page.update()
 
-    # --- 8. PIPELINE TASK & UI RESET ---
+    # --- 8. PIPELINE TASK ---
     def reset_ui_to_idle():
         nonlocal is_running
         is_running = False
         progress_ring.visible = False
-        run_button.text = "RUN JOB SEARCH"
-        run_button.bgcolor = "#1DB954"
+        run_button.text = "RUN JOB SEARCH"; run_button.bgcolor = "#1DB954"
         status_dot.bgcolor = "#1DB954" if is_auto_mode else "#6A6A6A"
         status_text.value = "AUTO-MODE (30m)" if is_auto_mode else "System Idle"
         status_text.color = "#1DB954" if is_auto_mode else "#6A6A6A"
@@ -143,51 +150,67 @@ def main(page: ft.Page):
         try:
             pipeline_process = subprocess.Popen(["python", "run_pipeline.py"])
             pipeline_process.wait() 
-        except Exception as e:
-            print(f"Pipeline Error: {e}")
+            
+            # --- FIXED NOTIFICATION LOGIC ---
+            if email_enabled:
+                cursor = storage.conn.cursor()
+                # 1. Grab jobs that have NEVER been emailed
+                cursor.execute("SELECT company, title, location, url, found_at FROM jobs WHERE sent_email = 0")
+                newly_found = [{"company": r[0], "title": r[1], "location": r[2], "url": r[3], "found_at": r[4]} for r in cursor.fetchall()]
+                
+                # 2. Guard: Only send if count > 0
+                if newly_found:
+                    send_job_email(newly_found, user_email)
+                    
+                    # 3. Mark these jobs as SENT so they aren't included next time
+                    cursor.execute("UPDATE jobs SET sent_email = 1 WHERE sent_email = 0")
+                    storage.conn.commit()
+
+        except Exception as e: print(f"Pipeline Error: {e}")
         finally:
-            # This block always runs when process ends (naturally or killed)
             reset_ui_to_idle()
             load_jobs_from_db(search_field.value)
 
-    # --- 9. RUN/STOP TOGGLE ---
+    # --- 9. RUN/STOP BUTTON ---
     def on_run_click(e):
         nonlocal is_running, pipeline_process
-        
         if is_running:
-            # Force stop
-            if pipeline_process:
-                pipeline_process.terminate()
-            status_text.value = "TERMINATING..."
-            status_text.color = "#CF6679"
-            page.update()
-            return
+            if pipeline_process: pipeline_process.terminate()
+            status_text.value = "TERMINATING..."; status_text.color = "#CF6679"
+            page.update(); return
 
         is_running = True
         progress_ring.visible = True
-        run_button.text = "STOP SEARCH" 
-        run_button.bgcolor = "#CF6679"
-        status_dot.bgcolor = "#1DB954"
-        status_text.value = "SEARCHING..."
-        status_text.color = "#1DB954"
+        run_button.text = "STOP SEARCH"; run_button.bgcolor = "#CF6679"
+        status_dot.bgcolor = "#1DB954"; status_text.value = "SEARCHING..."; status_text.color = "#1DB954"
         page.update()
         threading.Thread(target=run_pipeline_task, daemon=True).start()
 
-    # --- 10. SAFETY CLEANUP (Close window = Kill scraper) ---
-    def cleanup_on_close(e):
-        if pipeline_process:
-            pipeline_process.kill()
+    # --- 10. UI HANDLERS ---
+    def update_auto_mode(e):
+        nonlocal is_auto_mode
+        is_auto_mode = e.control.value
+        reset_ui_to_idle()
 
-    page.on_close = cleanup_on_close
+    def update_email_status(e):
+        nonlocal email_enabled
+        email_enabled = e.control.value; page.update()
 
-    # --- 11. UI ASSEMBLY ---
-    search_field = ft.TextField(hint_text="Search jobs or companies...", prefix_icon=ft.Icons.SEARCH, border_radius=15, bgcolor="#121212", border_color="#222222", on_change=lambda e: load_jobs_from_db(e.control.value))
-    
+    def update_recipient_email(e):
+        nonlocal user_email
+        user_email = e.control.value; page.update()
+
+    def navigate(e):
+        feed_view.visible = (e.control == feed_nav); settings_view.visible = (e.control == settings_nav)
+        feed_nav.selected = feed_view.visible; settings_nav.selected = settings_view.visible; page.update()
+
     def change_page(delta):
         nonlocal current_page
         current_page += delta
         load_jobs_from_db(search_field.value)
 
+    # --- 11. UI ASSEMBLY ---
+    search_field = ft.TextField(hint_text="Search jobs...", prefix_icon=ft.Icons.SEARCH, border_radius=15, bgcolor="#121212", border_color="#222222", on_change=lambda e: load_jobs_from_db(e.control.value))
     prev_btn = ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, on_click=lambda _: change_page(-1))
     next_btn = ft.IconButton(ft.Icons.ARROW_FORWARD_IOS, on_click=lambda _: change_page(1))
     run_button = ft.ElevatedButton("RUN JOB SEARCH", icon=ft.Icons.PLAY_ARROW, on_click=on_run_click, style=ft.ButtonStyle(bgcolor="#1DB954", color="white", shape=ft.RoundedRectangleBorder(radius=8)))
@@ -198,26 +221,19 @@ def main(page: ft.Page):
         ft.Container(content=ft.Row([prev_btn, page_number_text, next_btn], alignment=ft.MainAxisAlignment.CENTER, spacing=20), padding=ft.padding.only(bottom=20))
     ], expand=True, visible=True)
 
-    def navigate(e):
-        feed_view.visible = (e.control == feed_nav)
-        settings_view.visible = (e.control == settings_nav)
-        feed_nav.selected = feed_view.visible
-        settings_nav.selected = settings_view.visible
-        page.update()
-
     settings_view = ft.Column([
         ft.Container(content=ft.Column([
-            ft.Text("Settings", size=32, weight="bold", color="white"),
+            ft.Text("Settings", size=32, weight="bold"),
             ft.Container(height=20),
             ft.Container(content=ft.Column([
                 ft.Text("AUTOMATION", size=12, color="#1DB954", weight="bold"),
-                ft.Row([ft.Column([ft.Text("Auto-Scan Mode", size=16), ft.Text("Run every 30 minutes.", size=12, color="#6A6A6A")], expand=True), ft.Switch(value=is_auto_mode, active_color="#1DB954")]),
+                ft.Row([ft.Column([ft.Text("Auto-Scan Mode", size=16), ft.Text("Run every 30 minutes.", size=12, color="#6A6A6A")], expand=True), ft.Switch(value=is_auto_mode, active_color="#1DB954", on_change=update_auto_mode)]),
             ], spacing=10), padding=25, bgcolor="#121212", border_radius=15, border=ft.border.all(1, "#222222")),
             ft.Container(height=15),
             ft.Container(content=ft.Column([
                 ft.Text("NOTIFICATIONS", size=12, color="#1DB954", weight="bold"),
-                ft.Row([ft.Text("Email Alerts", expand=True, size=16), ft.Switch(value=email_enabled, active_color="#1DB954")]),
-                ft.TextField(label="Recipient Email", value=user_email, border_radius=10, bgcolor="#0B0B0B", border_color="#222222"),
+                ft.Row([ft.Text("Email Alerts", expand=True, size=16), ft.Switch(value=email_enabled, active_color="#1DB954", on_change=update_email_status)]),
+                ft.TextField(label="Recipient Email", value=user_email, border_radius=10, bgcolor="#0B0B0B", on_change=update_recipient_email),
             ], spacing=15), padding=25, bgcolor="#121212", border_radius=15, border=ft.border.all(1, "#222222"))
         ]), padding=40)
     ], expand=True, visible=False)

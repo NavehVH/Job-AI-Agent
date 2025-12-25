@@ -1,19 +1,19 @@
 # --- Security (NEVER UPLOAD THESE) ---
-openai_key.txt
+authorization.txt
 .env
 
-# --- Python System Files (Junk) ---
+# --- Python System Files ---
 __pycache__/
 *.pyc
 venv/
 .pytest_cache/
-.vscode/*.deb
+.vscode/
 
-
+# --- Build and Distribution ---
 dist/
 build/
 *.exe
-__pycache__/
-venv/
-jobs.db
 *.spec
+
+# --- Local Database ---
+jobs.db

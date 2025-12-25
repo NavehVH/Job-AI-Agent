@@ -17,9 +17,10 @@ class JobStorage:
                 location TEXT,
                 url TEXT,
                 posted_on TEXT,
-                description TEXT,  -- <--- NEW COLUMN
+                description TEXT,
                 is_junior BOOLEAN DEFAULT NULL,
                 tech_stack TEXT,
+                sent_email INTEGER DEFAULT 0,  -- <--- ADDED THIS TO THE INITIALIZER
                 found_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)

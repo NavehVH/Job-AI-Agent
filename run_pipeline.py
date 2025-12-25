@@ -7,6 +7,21 @@ import os
 from src.fetchers import Fetcher
 from src.storage import JobStorage
 
+# --- AUTHORIZATION LOGIC ---
+def get_openai_key():
+    """Reads the OpenAI API key from the central authorization file."""
+    try:
+        if not os.path.exists("authorization.txt"):
+            print("[!] Error: authorization.txt not found.")
+            return None
+        with open("authorization.txt", "r") as f:
+            for line in f:
+                if line.startswith("OPENAI_API_KEY="):
+                    return line.split("=")[1].strip()
+    except Exception as e:
+        print(f"[!] Error reading authorization.txt: {e}")
+    return None
+
 job_queue = queue.Queue()
 
 def database_worker():
@@ -21,7 +36,7 @@ def database_worker():
         
         if not storage.job_exists(job['id']):
             try:
-                # Keep your description fetcher for Workday jobs
+                # Use the session to fetch job descriptions for enrichment
                 headers = {"Accept": "application/json", "X-Workday-Subdomain": job.get('tenant_id', '')}
                 desc_url = job.get('description_url')
                 if desc_url:
@@ -41,10 +56,9 @@ def fast_scraper_worker(targets, fetcher):
     for target in targets:
         try:
             print(f"[*] Fetching jobs for {target['name']}...", flush=True)
-            jobs = fetcher.fetch(target) # This calls the specific Greenhouse/Comeet fetcher
+            jobs = fetcher.fetch(target) 
             if jobs:
                 for job in jobs:
-                    # WE MUST PUT THE JOBS IN THE QUEUE HERE
                     job_queue.put((job, target['name']))
         except Exception as e:
             print(f"    [!] Fast Scraper Error for {target['name']}: {e}")
@@ -85,6 +99,14 @@ def round_robin_scraper(targets, fetcher):
         offset += limit
 
 def main():
+    # 0. Load API Key
+    openai_api_key = get_openai_key()
+    if not openai_api_key:
+        print("[!] Critical Error: OPENAI_API_KEY missing from authorization.txt. Scraper might fail on AI tasks.")
+    else:
+        print("[*] Authorization loaded successfully.")
+
+    # 1. Start DB Worker
     with open('config/targets.json', 'r') as f:
         targets = json.load(f)
 
@@ -92,14 +114,13 @@ def main():
     workday_targets = [t for t in targets if t.get('type') == 'workday']
     fast_targets = [t for t in targets if t.get('type') not in ['workday', 'jobspy']]
 
-    # 1. Start DB Worker
     consumer = threading.Thread(target=database_worker, daemon=True)
     consumer.start()
 
-    # 2. Start Both Scraping Branches
+    # 2. Start Scraping Threads
     threads = [
         threading.Thread(target=round_robin_scraper, args=(workday_targets, fetcher)),
-        threading.Thread(target=fast_scraper_worker, args=(fast_targets, fetcher)) # Cleaned up threading
+        threading.Thread(target=fast_scraper_worker, args=(fast_targets, fetcher))
     ]
 
     for t in threads: t.start()
