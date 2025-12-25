@@ -1,0 +1,221 @@
+# --- Seniority & Leadership (To find Junior roles) ---
+senior
+sr.
+staff
+principal
+expert
+architect
+lead
+head
+director
+vp
+leader
+manager
+iii
+iv
+v
+seniority
+founding
+
+# --- Non-Technical / Business Roles ---
+controller
+bookkeeper
+revenue
+payroll
+accountant
+buyer
+planner
+sales
+account executive
+gtm
+representative
+bdr
+acquisition
+marketing
+recruiter
+talent
+hrbp
+receptionist
+coordinator
+communications
+office
+counsel
+legal
+partner
+customer experience
+specialist
+
+# --- Technical Adjacent (Not Software Engineering) ---
+technician
+helpdesk
+ux
+ui
+creative
+mechanical
+physicist
+it support
+it engineer
+lab technician
+board design
+optical
+maintenance
+quality validation
+
+# --- Security & Network Specific (If you want pure SWE) ---
+managed cloud
+detection
+responder
+threat researcher
+xdr
+incident
+security analyst
+cybersecurity grc
+
+
+# --- Seniority Bypasses ---
+sr # Adding without the dot just in case
+experienced
+staff
+expert
+
+# --- Non-SWE Tech Roles (IT & Support) ---
+helpdesk
+it support
+it engineer
+t3 # Common for Tier 3 support
+customer success
+technical support
+
+# --- Hardware & VLSI (Chip Design) ---
+silicon
+ic digital
+dft # Design for Test
+vlsi
+asic
+analog
+post-silicon
+rf # Radio Frequency
+fpga
+
+# --- Systems & Manufacturing ---
+npi # New Product Introduction
+planner
+mechanical
+optical
+maintenance
+supplier engineer
+logistics
+quality validation
+
+# --- Pure Data/Analyst (Non-SWE) ---
+bi data
+product analyst
+business analyst
+data analyst
+analyst
+researcher # Unless you want ML Research
+QA
+
+
+
+# --- Management & Leadership (To remove Team Leads) ---
+team leader
+team lead
+group lead
+group manager
+founding
+leader
+
+# --- Technical Support & Success (Not pure SWE) ---
+advocate
+relations
+solutions engineer
+success engineer
+technical support
+t3
+technician
+support engineer
+field engineer
+
+# --- Hardware & Low-Level (Nvidia/Intel Cleanup) ---
+ic digital
+dft
+vlsi
+asic
+analog
+post-silicon
+rf
+fpga
+electrical
+physics
+physicist
+optical
+optics
+laser
+cad
+mechanical
+npi
+supplier engineer
+
+# --- Specialized Research (PhD/Expert level) ---
+researcher
+scientist
+phd
+algorithms researcher
+data researcher
+ai analyst
+ai creative
+
+devops
+
+
+# --- Non-Technical / Admin (To remove Assistants) ---
+assistant
+reviewer
+operations
+
+# --- Design & Art (To remove Designers/Artists) ---
+designer
+artist
+ux
+ui
+
+# --- IT & Infrastructure (To remove SRE/DevOps/Admin) ---
+sre
+secops
+finops
+it support
+it engineer
+
+# --- Scientific & Math (Often PhD level) ---
+researcher
+scientist
+phd
+
+# --- Hardware/System Testing (Non-coding focus) ---
+qualification
+qual
+test product
+test reliability
+
+# --- Management/Leadership ---
+team leader
+team lead
+r&d team leader
+group manager
+# --- Administrative/Content ---
+assistant
+reviewer
+specialist
+operations
+# --- IT/Infrastructure (Non-SWE) ---
+finops
+sre
+secops
+# --- Specialized Technical ---
+artist
+research scientist
+# --- Specialized Testing ---
+qual
+qualification
+verification
