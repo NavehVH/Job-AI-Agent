@@ -4,8 +4,13 @@ import threading
 import queue
 import requests
 import os
+import sys, io
 from src.fetchers import Fetcher
 from src.storage import JobStorage
+
+# Force standard output to use UTF-8 regardless of the terminal environment
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # --- AUTHORIZATION LOGIC ---
 def get_openai_key():
@@ -45,7 +50,7 @@ def database_worker():
                         job['description'] = resp.json().get('jobPostingInfo', {}).get('jobDescription', '')
                 
                 storage.save_job(job)
-                print(f"    [SAVED] {job['title'][:40]:<40} | {source} ✅", flush=True)
+                print(f"    [SAVED] {job['title'][:40]:<40} | {source} ", flush=True)
             except Exception as e:
                 print(f"    [!] Error saving {job['title']}: {e}")
         
@@ -130,7 +135,7 @@ def main():
     job_queue.join()
     job_queue.put(None)
     consumer.join()
-    print("\n🏁 PIPELINE COMPLETE.")
+    print("\n PIPELINE COMPLETE.")
 
 if __name__ == "__main__":
     main()
