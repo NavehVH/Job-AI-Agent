@@ -43,13 +43,29 @@ class AppEngine:
             if not found:
                 f.write(f"{key_name}={new_value}\n")
 
+    def open_file(self, filename):
+        """Opens a file using the system's default application."""
+        try:
+            if not os.path.exists(filename):
+                with open(filename, "w") as f:
+                    f.write(f"# Created {filename}\n")
+            
+            if os.name == 'nt':  # Windows
+                os.startfile(filename)
+            elif sys.platform == 'darwin':  # macOS
+                subprocess.Popen(['open', filename])
+            else:  # Linux
+                subprocess.Popen(['xdg-open', filename])
+        except Exception as e:
+            print(f"Error opening file {filename}: {e}")
+
     def stop_pipeline(self):
         """Terminates the scraper process."""
         if self.pipeline_process:
             self.pipeline_process.terminate()
 
     def run_pipeline(self, log_callback, finish_callback):
-        """Starts the scraper with UTF-8 and saves heartbeat."""
+        """Starts the scraper, runs AI analysis, then sends notifications."""
         try:
             env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8" # Fix for emoji crashes
@@ -60,6 +76,7 @@ class AppEngine:
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = 0 
 
+            # 1. Start the Scraper Subprocess
             self.pipeline_process = subprocess.Popen(
                 ["python", "-u", "run_pipeline.py"], 
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -67,22 +84,30 @@ class AppEngine:
                 env=env, bufsize=1
             )
 
+            # 2. Live Log Streaming to GUI and Terminal
             while True:
                 line = self.pipeline_process.stdout.readline()
                 if not line: break
                 clean_line = line.strip()
-                print(clean_line) # Mirror to VSC Terminal
+                print(clean_line) 
                 sys.stdout.flush()
                 log_callback(clean_line)
 
             self.pipeline_process.wait() 
             
-            # Save the finish time to text file (Local Time)
+            # 3. Update Scan Heartbeat
             finish_ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             self.save_auth_value("LAST_SCAN_TIME", finish_ts)
             
+            # 4. RUN AI ANALYSIS
+            # Crucial: Must finish before Email sends to catch relevant roles
+            if self.pipeline_process.returncode == 0:
+                self.run_ai_analysis(log_callback)
+
+            # 5. SEND NOTIFICATIONS
             if self.email_enabled and self.pipeline_process.returncode == 0:
                 self.check_and_send_notifications()
+
         except Exception as e:
             log_callback(f"SYSTEM ERROR: {repr(e)}")
         finally:
@@ -94,12 +119,55 @@ class AppEngine:
         val = self.get_auth_value("LAST_SCAN_TIME")
         return val if val else "Never"
 
-    def check_and_send_notifications(self):
-        """Processes new jobs for email."""
+    def run_ai_analysis(self, log_callback):
+        from src.brain import JobBrain
+        brain = JobBrain()
+        
+        self.storage.conn.commit()
         cursor = self.storage.conn.cursor()
-        cursor.execute("SELECT company, title, location, url, found_at FROM jobs WHERE sent_email = 0")
+        
+        cursor.execute("SELECT id, title, description FROM jobs WHERE is_relevant = 0")
+        pending_jobs = cursor.fetchall()
+
+        for j_id, title, desc in pending_jobs:
+            analysis = brain.analyze(title, desc or "")
+            if analysis:
+                status = 1 if analysis.is_relevant else -1
+                
+                # --- CORRECT SAVING LOGIC ---
+                # We update the NEW columns and keep the description untouched!
+                cursor.execute("""
+                    UPDATE jobs SET 
+                        is_relevant = ?, 
+                        ai_reason = ?, 
+                        tech_stack = ?,
+                        years_required = ?
+                    WHERE id = ?
+                """, (
+                    status, 
+                    analysis.reason, 
+                    ", ".join(analysis.tech_stack), 
+                    analysis.years_required,
+                    j_id
+                ))
+                self.storage.conn.commit()
+                log_callback(f"  {'+' if status == 1 else 'x'} {title[:30]}")
+
+    def check_and_send_notifications(self):
+        """Processes only AI-approved jobs for email alerts."""
+        self.storage.conn.commit()
+        cursor = self.storage.conn.cursor()
+        
+        # Only select jobs that are RELEVANT (1) and haven't been emailed yet (0)
+        cursor.execute("""
+            SELECT company, title, location, url, found_at 
+            FROM jobs 
+            WHERE sent_email = 0 AND is_relevant = 1
+        """)
         newly_found = [{"company": r[0], "title": r[1], "location": r[2], "url": r[3], "found_at": r[4]} for r in cursor.fetchall()]
+        
         if newly_found:
             send_job_email(newly_found, self.user_email)
-            cursor.execute("UPDATE jobs SET sent_email = 1 WHERE sent_email = 0")
+            # Mark these specific jobs as sent
+            cursor.execute("UPDATE jobs SET sent_email = 1 WHERE sent_email = 0 AND is_relevant = 1")
             self.storage.conn.commit()

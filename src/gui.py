@@ -6,7 +6,7 @@ import src.config as cfg
 
 def main(page: ft.Page):
     # --- 1. SETUP ---
-    page.title = "JobAgent Pro - Command Center"
+    page.title = "JobAgent"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = cfg.BG_COLOR
     page.window_width = cfg.WINDOW_WIDTH
@@ -140,23 +140,53 @@ def main(page: ft.Page):
 
     feed_view = ft.Column([ft.Container(search_field, padding=25), job_list, ft.Container(ft.Row([prev_btn, page_number_text, next_btn], alignment="center", spacing=20), padding=20)], expand=True)
     
+    # --- 6. UI ASSEMBLY (Updated with Scroll) ---
     settings_view = ft.Column([
-        ft.Container(content=ft.Column([
-            ft.Text("Settings", size=32, weight="bold"),
-            ft.Container(height=20),
-            ft.Container(content=ft.Column([
-                ft.Text("AUTOMATION", size=12, color=cfg.ACCENT_COLOR, weight="bold"),
-                ft.Row([ft.Column([ft.Text("Auto-Scan Mode", size=16), ft.Text("Run every 30 minutes.", size=12, color=cfg.TEXT_GREY)], expand=True), 
-                        ft.Switch(value=engine.is_auto_mode, active_color=cfg.ACCENT_COLOR, on_change=lambda e: (setattr(engine, 'is_auto_mode', e.control.value), engine.save_auth_value("AUTO_SCAN_ENABLED", str(e.control.value)), on_pipeline_finish()))]),
-            ], spacing=10), padding=25, bgcolor=cfg.CARD_BG, border_radius=15),
-            ft.Container(height=15),
-            ft.Container(content=ft.Column([
-                ft.Text("NOTIFICATIONS", size=12, color=cfg.ACCENT_COLOR, weight="bold"),
-                ft.Row([ft.Text("Email Alerts", expand=True, size=16), ft.Switch(value=engine.email_enabled, active_color=cfg.ACCENT_COLOR, on_change=lambda e: setattr(engine, 'email_enabled', e.control.value))]),
-                ft.TextField(label="Recipient Email", value=engine.user_email, on_change=lambda e: (setattr(engine, 'user_email', e.control.value), engine.save_auth_value("RECIPIENT_EMAIL", e.control.value))),
-            ], spacing=15), padding=25, bgcolor=cfg.CARD_BG, border_radius=15)
-        ]), padding=40)
-    ], expand=True, visible=False)
+        ft.Container(
+            content=ft.Column([
+                ft.Text("Settings", size=32, weight="bold"),
+                ft.Container(height=20),
+                
+                # AUTOMATION SECTION
+                ft.Container(content=ft.Column([
+                    ft.Text("AUTOMATION", size=12, color=cfg.ACCENT_COLOR, weight="bold"),
+                    ft.Row([ft.Column([ft.Text("Auto-Scan Mode", size=16), ft.Text("Run every 30 minutes.", size=12, color=cfg.TEXT_GREY)], expand=True), 
+                            ft.Switch(value=engine.is_auto_mode, active_color=cfg.ACCENT_COLOR, on_change=lambda e: (setattr(engine, 'is_auto_mode', e.control.value), engine.save_auth_value("AUTO_SCAN_ENABLED", str(e.control.value)), on_pipeline_finish()))]),
+                ], spacing=10), padding=25, bgcolor=cfg.CARD_BG, border_radius=15),
+                
+                ft.Container(height=15),
+                
+                # NOTIFICATIONS SECTION
+                ft.Container(content=ft.Column([
+                    ft.Text("NOTIFICATIONS", size=12, color=cfg.ACCENT_COLOR, weight="bold"),
+                    ft.Row([ft.Text("Email Alerts", expand=True, size=16), ft.Switch(value=engine.email_enabled, active_color=cfg.ACCENT_COLOR, on_change=lambda e: setattr(engine, 'email_enabled', e.control.value))]),
+                    ft.TextField(label="Recipient Email", value=engine.user_email, on_change=lambda e: (setattr(engine, 'user_email', e.control.value), engine.save_auth_value("RECIPIENT_EMAIL", e.control.value))),
+                ], spacing=15), padding=25, bgcolor=cfg.CARD_BG, border_radius=15),
+                
+                ft.Container(height=15),
+                
+                # SYSTEM FILES SECTION
+                ft.Container(content=ft.Column([
+                    ft.Text("SYSTEM FILES", size=12, color=cfg.ACCENT_COLOR, weight="bold"),
+                    ft.Row([
+                        ft.Column([
+                            ft.Text("System Credentials", size=16),
+                            ft.Text("Edit API keys and recipient email.", size=12, color=cfg.TEXT_GREY)
+                        ], expand=True),
+                        ft.TextButton("EDIT AUTH", on_click=lambda _: engine.open_file("authorization.txt"))
+                    ]),
+                    ft.Row([
+                        ft.Column([
+                            ft.Text("Exclusion Filters", size=16),
+                            ft.Text("Edit keywords to skip specific job titles.", size=12, color=cfg.TEXT_GREY)
+                        ], expand=True),
+                        ft.TextButton("EDIT FILTERS", on_click=lambda _: engine.open_file("filters.txt"))
+                    ]),
+                ], spacing=15), padding=25, bgcolor=cfg.CARD_BG, border_radius=15)
+                
+            ]), padding=40
+        )
+    ], expand=True, visible=False, scroll=ft.ScrollMode.AUTO) # FIXED: Added scroll mode
 
     feed_nav = ft.ListTile(leading=ft.Icon(ft.Icons.DASHBOARD, color=cfg.ACCENT_COLOR), title=ft.Text("Job Feed", color="white"), on_click=on_nav_change)
     settings_nav = ft.ListTile(leading=ft.Icon(ft.Icons.SETTINGS, color=cfg.TEXT_GREY), title=ft.Text("Settings", color=cfg.TEXT_GREY), on_click=on_nav_change)

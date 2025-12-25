@@ -216,6 +216,4 @@ secops
 artist
 research scientist
 # --- Specialized Testing ---
-qual
 qualification
-verification

@@ -162,6 +162,18 @@ def main():
     job_queue.join()
     job_queue.put(None)
     consumer.join()
+
+    # --- NEW: START AI ANALYSIS ---
+    print("\n[*] Starting AI Brain Analysis...", flush=True)
+    try:
+        from src.storage import JobStorage
+        from src.engine import AppEngine
+        # We re-initialize here to ensure we use the same DB connection style
+        engine = AppEngine(JobStorage())
+        engine.run_ai_analysis(lambda msg: print(f"    {msg}", flush=True))
+    except Exception as e:
+        print(f"[!] Brain Error: {e}")
+
     print("\n PIPELINE COMPLETE.")
 
 if __name__ == "__main__":
