@@ -15,6 +15,7 @@ class AppEngine:
         self.email_enabled = True
 
     def get_auth_value(self, key_name):
+        """Reads settings from authorization.txt."""
         try:
             if not os.path.exists("authorization.txt"): return None
             with open("authorization.txt", "r") as f:
@@ -26,6 +27,7 @@ class AppEngine:
         return None
 
     def save_auth_value(self, key_name, new_value):
+        """Saves settings to authorization.txt."""
         lines = []
         found = False
         if os.path.exists("authorization.txt"):
@@ -41,24 +43,16 @@ class AppEngine:
             if not found:
                 f.write(f"{key_name}={new_value}\n")
 
-    def get_db_last_run(self):
-        cursor = self.storage.conn.cursor()
-        try:
-            cursor.execute("SELECT MAX(found_at) FROM jobs")
-            res = cursor.fetchone()[0]
-            return res.split(" ")[1] if res else "Never"
-        except: return "Never"
-
     def stop_pipeline(self):
+        """Terminates the scraper process."""
         if self.pipeline_process:
             self.pipeline_process.terminate()
 
     def run_pipeline(self, log_callback, finish_callback):
-        """Starts the scraper with forced UTF-8 to prevent charmap crashes."""
+        """Starts the scraper with UTF-8 and saves heartbeat."""
         try:
-            # Force UTF-8 for both internal Python and the IO stream
             env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "utf-8"
+            env["PYTHONIOENCODING"] = "utf-8" # Fix for emoji crashes
 
             startupinfo = None
             if os.name == 'nt':
@@ -68,43 +62,40 @@ class AppEngine:
 
             self.pipeline_process = subprocess.Popen(
                 ["python", "-u", "run_pipeline.py"], 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.STDOUT,
-                text=True, 
-                encoding='utf-8',  # Explicitly handle UTF-8 incoming data
-                errors='replace',  # If a character is truly broken, don't crash, just replace it
-                startupinfo=startupinfo, 
-                bufsize=1,
-                env=env
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding='utf-8', errors='replace',
+                env=env, bufsize=1
             )
 
             while True:
                 line = self.pipeline_process.stdout.readline()
                 if not line: break
-                
                 clean_line = line.strip()
-                
-                # Print to VS Code Terminal
-                print(clean_line)
-                sys.stdout.flush() 
-                
-                # Send to GUI log window
+                print(clean_line) # Mirror to VSC Terminal
+                sys.stdout.flush()
                 log_callback(clean_line)
 
             self.pipeline_process.wait() 
             
-            if self.email_enabled and self.pipeline_process and self.pipeline_process.returncode == 0:
+            # Save the finish time to text file (Local Time)
+            finish_ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.save_auth_value("LAST_SCAN_TIME", finish_ts)
+            
+            if self.email_enabled and self.pipeline_process.returncode == 0:
                 self.check_and_send_notifications()
         except Exception as e:
-            # Safely log the error without triggering another encoding crash
-            error_msg = f"SYSTEM ERROR: {str(e).encode('ascii', 'ignore').decode()}"
-            log_callback(error_msg)
-            print(error_msg)
+            log_callback(f"SYSTEM ERROR: {repr(e)}")
         finally:
             self.is_running = False
             finish_callback()
 
+    def get_last_scan_display(self):
+        """Retrieves the scan heartbeat."""
+        val = self.get_auth_value("LAST_SCAN_TIME")
+        return val if val else "Never"
+
     def check_and_send_notifications(self):
+        """Processes new jobs for email."""
         cursor = self.storage.conn.cursor()
         cursor.execute("SELECT company, title, location, url, found_at FROM jobs WHERE sent_email = 0")
         newly_found = [{"company": r[0], "title": r[1], "location": r[2], "url": r[3], "found_at": r[4]} for r in cursor.fetchall()]
