@@ -1,97 +1,69 @@
-# AI Agent Job Hunter
 
-An AI agent for automated job search. Still working on it and adding ideas.
-This tool scans major tech company career sites for Junior / Student positions in Israel, or any role type you configure.
+# JobAgent AI: Automated Junior Role Identification
 
-The project is designed to solve the "Junior Problem": endless scrolling through career sites only to discover roles that secretly require years of experience.
+JobAgent AI is a specialized automation pipeline designed to identify entry-level software positions within the Israeli technology sector. The system addresses the difficulty of manual job searching by implementing a multi-stage workflow: Scrape, Filter, AI Analysis, and Notification. Unlike standard aggregators, JobAgent AI utilizes GPT-4o-mini to analyze the full text of job descriptions. This ensures that roles labeled as "Software Engineer" which secretly require 5+ years of experience are discarded, while legitimate entry-level opportunities are prioritized.
 
-The agent fetches job data from multiple platforms, filters strictly for Israel, and uses OpenAI gpt-4o-mini to analyze the actual job description (not just the title) in order to decide whether a role is truly entry-level and worth notifying about.
+## Screenshots
+GUI with jobs found:
+![Jobs Screenshot](media/jobs.jpeg)
 
----
+GUI with different settings:
+![Settings Screenshot](media/settings.jpeg)
 
-## Next steps to add to this project
-Style and edit the UI forntend to work with the current pipleline, add email notifications and add the AI brain to the pipeline.
+Email and notifications:<br/>
 
+<img src="media/email.jpeg" width="300" alt="Email Page">
+<img src="media/notification.jpeg" width="300" alt="Notifications">
 
-## Features
+### Core Capabilities and Coverage
+The agent adapts its fetching strategy across four major Applicant Tracking Systems (ATS) and broad job board aggregators to provide a realistic market view.
+* **Direct ATS Integration:** Native support for Workday (Intel, Nvidia, Dell), Greenhouse (Wiz, Melio), Comeet (Fiverr, Team8), and SmartRecruiters (CyberArk).
+* **Job Board Aggregation:** Utilizes JobSpy to scan LinkedIn and Glassdoor for new listings added in the last 24 hours, detecting "hidden" junior roles.
+* **AI-Powered Vetting:** GPT-4o-mini searches for experience indicators such as "0-2 years," "new grad," or "intern" within the full job description.
+* **Strict Localization:** High-precision filtering for Israel-based roles only (Tel Aviv, Haifa, Yokneam, etc.).
+* **Performance Architecture:** Employs lazy loading to fetch full descriptions only for relevant roles, reducing bandwidth and API costs.
+* **Management Dashboard:** A dark-themed GUI built with Flet for real-time monitoring, live logging, and job feed management.
 
-### Multi-Platform and Comprehensive Coverage
+## Technical Reference
 
-The agent adapts its fetching strategy to four different Applicant Tracking Systems (ATS) and aggregates results from job boards to provide a broad and realistic market view.
+### Stack and Project Map
+* **Backend:** Python 3.10+ using `requests`, `beautifulsoup4`, `pydantic`, and `python-jobspy`.
+* **Interface:** Flet (Flutter for Python).
+* **AI Logic:** OpenAI API (GPT-4o-mini).
+* **Database:** SQLite (Local).
 
-#### Direct Company Sources (ATS)
-- Workday (Intel, Nvidia, Dell, etc.)
-- Greenhouse (Wiz, Riskified, Melio, etc.)
-- Comeet (Fiverr, Moon Active, Team8, etc.)
-- SmartRecruiters (CyberArk, Western Digital, etc.)
+**File Map:**
+* `src/gui.py`: Dashboard interface and auto-scan logic.
+* `src/engine.py`: Conductor for Scrape, AI, and Email pipeline.
+* `src/brain.py`: Structured AI analysis logic.
+* `src/storage.py`: SQLite database management.
+* `run_pipeline.py`: Independent scraper worker process.
+* `authorization.txt` & `filters.txt`: Credentials and keyword exclusion lists.
 
-#### Job Board Aggregation
-- Uses JobSpy to scan LinkedIn, Glassdoor, and similar boards for new jobs added in the last 24 hours
-- Helps detect so-called hidden junior roles from companies not explicitly targeted
+### Database State Logic
+The system manages job states in the `is_relevant` column using the following integer values to ensure smart deduplication:
+* **0 (Unprocessed):** Job has been scraped but not yet analyzed by the AI.
+* **1 (Relevant):** AI has confirmed the role is suitable for 0-2 years of experience.
+* **-1 (Irrelevant):** AI has rejected the role due to experience requirements or title mismatch.
 
----
+## Installation and Configuration
 
-### Intelligent Filtering and Analysis
+1. Clone the repository:
+   git clone https://github.com/your-username/job-agent-ai.git
 
-- AI-powered vetting: GPT reads the full job description and searches for experience indicators such as 0-2 years, new grad, student, or intern
-- Strict location filtering: only Israel-based roles are analyzed (Tel Aviv, Haifa, Yokneam, etc.)
-- Deduplication: an SQLite database ensures each job is stored only once, even if found via multiple sources
+2. Install required dependencies:
+   pip install flet openai pydantic requests beautifulsoup4 python-jobspy
 
----
+3. Configure credentials:
+   Create an authorization.txt file in the root directory to store your OpenAI API key and Gmail App Password.
 
-### Performance and Architecture
-
-- Lazy loading: full job descriptions are fetched only for relevant Israel-based roles to reduce bandwidth and API usage
-- Modular design: adding a new company or source requires only a configuration change
-
----
-
-## Tech Stack
-
-- Language: Python 3.10+
-- Database: SQLite (local, zero-configuration)
-- AI Engine: OpenAI API (gpt-4o-mini)
-- Libraries:
-  - requests
-  - pydantic
-  - sqlite3
-  - python-jobspy
-  - pandas
-
----
-
-## Installation
-
-### 1) Clone the repository
-
-### 2) Install dependencies
-```bash
-pip install requests openai pydantic python-jobspy pandas
+## Execution
+To launch the application dashboard, run the following command from the root directory:
+```
+python -m src.gui
 ```
 
-### 3) Set up OpenAI API key
-1. Obtain an API key from the OpenAI Platform
-2. Create a file named openai_key.txt in the project root
-3. Paste your key inside (single line, starting with sk-)
-4. This file is git-ignored for security
-
----
-
-## Usage
-
-### 1) Run the agent
-```bash
-python run_pipeline.py
-```
-
-### 2) View results
-```bash
-sqlite3 jobs.db "SELECT company, title, location, url FROM jobs WHERE is_junior = 1;"
-```
-
----
-
-## Configuration
+## Configuration of Targets
 
 Edit:
 ```
@@ -118,30 +90,6 @@ config/targets.json
   "limit": 30
 }
 ```
-
----
-
-## Project Structure
-
-```
-.
-├── config/
-│   └── targets.json
-├── src/
-│   ├── fetchers/
-│   │   ├── __init__.py
-│   │   ├── workday.py
-│   │   ├── greenhouse.py
-│   │   ├── comeet.py
-│   │   └── jobspy_aggr.py
-│   ├── brain.py
-│   └── storage.py
-├── run_pipeline.py
-├── jobs.db
-└── openai_key.txt
-```
-
----
 
 ## License
 

@@ -151,14 +151,19 @@ class AppEngine:
         self.storage.conn.commit()
         cursor = self.storage.conn.cursor()
         
-        # Money-saving logic: Only look at jobs found in the last 20 minutes
-        time_threshold = (datetime.datetime.now() - datetime.timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S')
+        # FIX: Use utcnow() so it matches the UTC timestamps in the DB
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        time_threshold = (now_utc - datetime.timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S')
         
         msg = "[*] Starting AI Brain Analysis..."
-        print(msg) # <--- THIS PRINT SHOWS IN VS CODE
+        print(msg)
         log_callback(msg)
         
-        # Find jobs that are unprocessed AND fresh
+        # DIAGNOSTIC: Check if any unprocessed jobs exist at all before the time filter
+        cursor.execute("SELECT COUNT(*) FROM jobs WHERE is_relevant = 0")
+        total_unprocessed = cursor.fetchone()[0]
+        
+        # The actual filtered query
         cursor.execute("""
             SELECT id, title, description 
             FROM jobs 
@@ -168,8 +173,8 @@ class AppEngine:
         pending_jobs = cursor.fetchall()
         
         if not pending_jobs:
-            msg = "AI: No new jobs in this scan to analyze."
-            print(msg) # <--- THIS PRINT SHOWS IN VS CODE
+            msg = f"AI: Found {total_unprocessed} total pending jobs, but 0 within the 20m window."
+            print(msg)
             log_callback(msg)
             return
 
