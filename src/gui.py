@@ -81,16 +81,6 @@ def main(page: ft.Page):
                         visible=is_new
                     )
                 ], alignment="spaceBetween"),
-                
-                # --- NEW: AI Reason Display ---
-                ft.Text(
-                    job.get('ai_reason', 'Analyzing requirements...'), 
-                    size=12, 
-                    color="#888888", 
-                    italic=True,
-                    max_lines=1,
-                    overflow=ft.TextOverflow.ELLIPSIS
-                ),
 
                 ft.Row([
                     # Dynamic Tech Badges Row
@@ -239,7 +229,45 @@ def main(page: ft.Page):
                             ft.Switch(value=engine.is_auto_mode, active_color=cfg.ACCENT_COLOR, on_change=lambda e: (setattr(engine, 'is_auto_mode', e.control.value), engine.save_auth_value("AUTO_SCAN_ENABLED", str(e.control.value)), on_pipeline_finish()))]),
                 ], spacing=10), padding=25, bgcolor=cfg.CARD_BG, border_radius=15),
                 
-                ft.Container(height=15),
+                
+                
+                # AI TOGGLE SECTION
+    ft.Container(content=ft.Column([
+        ft.Text("AI PROCESSING", size=12, color=cfg.ACCENT_COLOR, weight="bold"),
+        ft.Row([
+            ft.Column([
+                ft.Text("Enable AI Brain", size=16), 
+                ft.Text("AI will filter for junior roles and extract tech stack.", size=12, color=cfg.TEXT_GREY),
+                ft.Text("⚠️ WARNING: Uses API credits. Turn off to save money.", size=11, color=cfg.ERROR_COLOR)
+            ], expand=True), 
+            ft.Switch(
+                value=engine.ai_enabled, 
+                active_color=cfg.ACCENT_COLOR, 
+                on_change=lambda e: (
+                    setattr(engine, 'ai_enabled', e.control.value), 
+                    engine.save_auth_value("AI_ENABLED", str(e.control.value))
+                )
+            )
+        ]),
+    ], spacing=10), padding=25, bgcolor=cfg.CARD_BG, border_radius=15),
+
+    # FILTER TOGGLE SECTION
+    ft.Container(content=ft.Column([
+        ft.Text("SCRAPER FILTERS", size=12, color=cfg.ACCENT_COLOR, weight="bold"),
+        ft.Row([
+            ft.Column([
+                ft.Text("Enable Keyword Filtering", size=16), 
+            ], expand=True), 
+            ft.Switch(
+                value=engine.filter_enabled, 
+                active_color=cfg.ACCENT_COLOR, 
+                on_change=lambda e: (
+                    setattr(engine, 'filter_enabled', e.control.value), 
+                    engine.save_auth_value("FILTER_ENABLED", str(e.control.value))
+                )
+            )
+        ]),
+    ], spacing=10), padding=25, bgcolor=cfg.CARD_BG, border_radius=15),
                 
                 # NOTIFICATIONS SECTION
                 ft.Container(content=ft.Column([

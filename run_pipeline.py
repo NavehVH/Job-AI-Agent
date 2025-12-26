@@ -5,52 +5,38 @@ import queue
 import requests
 import os
 import sys, io
-import re  # NEW: Required for word boundary matching
+import re
 from src.fetchers import Fetcher
 from src.storage import JobStorage
 
-# Force standard output to use UTF-8 regardless of the terminal environment
+# Force standard output to use UTF-8
 if sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-# --- AUTHORIZATION LOGIC ---
-def get_openai_key():
-    """Reads the OpenAI API key from the central authorization file."""
-    try:
-        if not os.path.exists("authorization.txt"):
-            print("[!] Error: authorization.txt not found.")
-            return None
-        with open("authorization.txt", "r") as f:
-            for line in f:
-                if line.startswith("OPENAI_API_KEY="):
-                    return line.split("=")[1].strip()
-    except Exception as e:
-        print(f"[!] Error reading authorization.txt: {e}")
-    return None
-
-# --- UPDATED: ROBUST FILTERING LOGIC ---
+# --- UPDATED: LISTEN TO FILTER TOGGLE ---
 def should_keep_job(title):
-    """Checks if the job title contains any blacklisted words using regex word boundaries."""
+    """Checks if filtering is enabled and applies regex blacklist."""
+    # Logic: Check the environment variable set by engine.py
+    enable_filters = os.environ.get("ENABLE_FILTERS") == "True"
+    
+    if not enable_filters:
+        return True # Trigger is OFF: let everything through
+        
     if not os.path.exists("filters.txt"):
         return True
     
     try:
         with open("filters.txt", "r", encoding='utf-8') as f:
-            # Clean lines: skip comments (#) and empty lines
             excluded_keywords = []
             for line in f:
                 clean_line = line.strip().lower()
                 if clean_line and not clean_line.startswith("#"):
-                    # Remove inline comments like '# Common for Tier 3'
                     keyword = clean_line.split("#")[0].strip()
                     if keyword:
                         excluded_keywords.append(keyword)
         
         title_lower = title.lower()
-        
         for keyword in excluded_keywords:
-            # Use \b (word boundary) to ensure 'sr' matches 'Sr Backend' 
-            # but doesn't match 'Israel' or 'asr'
             pattern = r'\b' + re.escape(keyword) + r'\b'
             if re.search(pattern, title_lower):
                 return False
@@ -71,10 +57,8 @@ def database_worker():
         if item is None: break
         job, source = item
         
-        # Apply the new Regex Filter
+        # Respect the toggle logic defined above
         if not should_keep_job(job['title']):
-            # Optional: Print filtered jobs to verify it's working
-            # print(f"    [-] Filtered: {job['title'][:40]}", flush=True)
             job_queue.task_done()
             continue
 
@@ -94,6 +78,7 @@ def database_worker():
         
         job_queue.task_done()
 
+# ... (fast_scraper_worker and round_robin_scraper remain the same) ...
 def fast_scraper_worker(targets, fetcher):
     for target in targets:
         try:
@@ -135,12 +120,13 @@ def round_robin_scraper(targets, fetcher):
         offset += limit
 
 def main():
-    openai_api_key = get_openai_key()
-    if not openai_api_key:
-        print("[!] Critical Error: OPENAI_API_KEY missing from authorization.txt.")
-    else:
-        print("[*] Authorization loaded successfully.")
+    # Only show warning, don't stop execution.
+    # AppEngine now handles the key validation before triggering the Brain.
+    if not os.path.exists("authorization.txt"):
+        print("[!] Warning: authorization.txt missing.")
 
+    print("[*] Scraper started. Checking filters...", flush=True)
+    
     with open('config/targets.json', 'r') as f:
         targets = json.load(f)
 
@@ -162,19 +148,6 @@ def main():
     job_queue.join()
     job_queue.put(None)
     consumer.join()
-
-    # --- NEW: START AI ANALYSIS ---
-    print("\n[*] Starting AI Brain Analysis...", flush=True)
-    try:
-        from src.storage import JobStorage
-        from src.engine import AppEngine
-        # We re-initialize here to ensure we use the same DB connection style
-        engine = AppEngine(JobStorage())
-        engine.run_ai_analysis(lambda msg: print(f"    {msg}", flush=True))
-    except Exception as e:
-        print(f"[!] Brain Error: {e}")
-
-    print("\n PIPELINE COMPLETE.")
 
 if __name__ == "__main__":
     main()

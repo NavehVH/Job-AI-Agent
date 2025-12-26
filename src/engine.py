@@ -7,6 +7,8 @@ class AppEngine:
         self.pipeline_process = None
         self.is_running = False
         self.last_run_timestamp = 0
+        self.ai_enabled = False
+        self.filter_enabled = True
         
         # Load persistent settings
         self.user_email = self.get_auth_value("RECIPIENT_EMAIL") or "navehhadas@gmail.com"
@@ -67,8 +69,15 @@ class AppEngine:
     def run_pipeline(self, log_callback, finish_callback):
         """Starts the scraper, runs AI analysis, then sends notifications."""
         try:
+            # Load current toggle states from authorization.txt
+            self.ai_enabled = self.get_auth_value("AI_ENABLED") == "True"
+            self.filter_enabled = self.get_auth_value("FILTER_ENABLED") == "True"
+
             env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "utf-8" # Fix for emoji crashes
+            env["PYTHONIOENCODING"] = "utf-8"
+            
+            # Pass the filter setting to the scraper via environment variable
+            env["ENABLE_FILTERS"] = "True" if self.filter_enabled else "False"
 
             startupinfo = None
             if os.name == 'nt':
@@ -76,7 +85,6 @@ class AppEngine:
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = 0 
 
-            # 1. Start the Scraper Subprocess
             self.pipeline_process = subprocess.Popen(
                 ["python", "-u", "run_pipeline.py"], 
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -84,7 +92,7 @@ class AppEngine:
                 env=env, bufsize=1
             )
 
-            # 2. Live Log Streaming to GUI and Terminal
+            # This loop already handles printing scraper logs to the console
             while True:
                 line = self.pipeline_process.stdout.readline()
                 if not line: break
@@ -95,21 +103,38 @@ class AppEngine:
 
             self.pipeline_process.wait() 
             
-            # 3. Update Scan Heartbeat
             finish_ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             self.save_auth_value("LAST_SCAN_TIME", finish_ts)
             
-            # 4. RUN AI ANALYSIS
-            # Crucial: Must finish before Email sends to catch relevant roles
+            # --- UPDATED MESSAGING LOGIC ---
             if self.pipeline_process.returncode == 0:
-                self.run_ai_analysis(log_callback)
+                if self.ai_enabled:
+                    # Only check for key if AI is on
+                    if self.get_auth_value("OPENAI_API_KEY"):
+                        # Ensure run_ai_analysis ALSO has prints inside it
+                        self.run_ai_analysis(log_callback)
+                    else:
+                        msg = "SYSTEM: AI enabled but API Key is missing in authorization.txt"
+                        print(msg) # Shows in VS Code
+                        log_callback(msg) # Shows in GUI
+                else:
+                    msg = "SYSTEM: AI Processing is disabled. Skipping analysis."
+                    print(msg) # Shows in VS Code
+                    log_callback(msg) # Shows in GUI
 
-            # 5. SEND NOTIFICATIONS
             if self.email_enabled and self.pipeline_process.returncode == 0:
                 self.check_and_send_notifications()
+                
+            # --- ADD THIS HERE ---
+            # Now it truly means everything is finished
+            final_msg = "\n--- ALL SYSTEMS COMPLETE ---"
+            print(final_msg)
+            log_callback(final_msg)
 
         except Exception as e:
-            log_callback(f"SYSTEM ERROR: {repr(e)}")
+            err_msg = f"SYSTEM ERROR: {repr(e)}"
+            print(err_msg) # Shows in VS Code
+            log_callback(err_msg) # Shows in GUI
         finally:
             self.is_running = False
             finish_callback()
@@ -126,16 +151,34 @@ class AppEngine:
         self.storage.conn.commit()
         cursor = self.storage.conn.cursor()
         
-        cursor.execute("SELECT id, title, description FROM jobs WHERE is_relevant = 0")
+        # Money-saving logic: Only look at jobs found in the last 20 minutes
+        time_threshold = (datetime.datetime.now() - datetime.timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S')
+        
+        msg = "[*] Starting AI Brain Analysis..."
+        print(msg) # <--- THIS PRINT SHOWS IN VS CODE
+        log_callback(msg)
+        
+        # Find jobs that are unprocessed AND fresh
+        cursor.execute("""
+            SELECT id, title, description 
+            FROM jobs 
+            WHERE is_relevant = 0 AND found_at > ?
+        """, (time_threshold,))
+        
         pending_jobs = cursor.fetchall()
+        
+        if not pending_jobs:
+            msg = "AI: No new jobs in this scan to analyze."
+            print(msg) # <--- THIS PRINT SHOWS IN VS CODE
+            log_callback(msg)
+            return
 
         for j_id, title, desc in pending_jobs:
             analysis = brain.analyze(title, desc or "")
             if analysis:
                 status = 1 if analysis.is_relevant else -1
                 
-                # --- CORRECT SAVING LOGIC ---
-                # We update the NEW columns and keep the description untouched!
+                # Update specific AI columns in the database
                 cursor.execute("""
                     UPDATE jobs SET 
                         is_relevant = ?, 
@@ -151,8 +194,12 @@ class AppEngine:
                     j_id
                 ))
                 self.storage.conn.commit()
-                log_callback(f"  {'+' if status == 1 else 'x'} {title[:30]}")
-
+                
+                # Formulate the result log
+                log_line = f"  {'RELEVANT' if status == 1 else 'SKIPPED'}: {title[:30]}"
+                print(log_line) # <--- THIS PRINT SHOWS IN VS CODE
+                log_callback(log_line)
+                
     def check_and_send_notifications(self):
         """Processes only AI-approved jobs for email alerts."""
         self.storage.conn.commit()

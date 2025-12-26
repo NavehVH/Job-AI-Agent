@@ -4,9 +4,9 @@ import os
 
 # Define the output structure for the AI
 class JobAnalysis(BaseModel):
-    is_relevant: bool = Field(description="True if the job is suitable for 0-3 years experience. False if it's Senior/Staff/Lead.")
+    is_relevant: bool = Field(description="True if the job is suitable for 0-3 years experience. False if it's Senior/Staff/Lead/etc..")
     years_required: int = Field(description="The minimum years of experience mentioned (0 if not specified).")
-    tech_stack: list[str] = Field(description="The 3-5 main technologies mentioned.")
+    tech_stack: list[str] = Field(description="Extract 1 to 5 specific tech keywords (languages, frameworks, OS) mentioned, ignoring HTML tags.")
     reason: str = Field(description="One short sentence explaining why it is or isn't relevant.")
 
 class JobBrain:
