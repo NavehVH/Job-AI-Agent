@@ -12,8 +12,12 @@ GUI with different settings:
 
 Email and notifications:<br/>
 
-<img src="media/email.jpeg" width="300" alt="Email Page">
-<img src="media/notification.jpeg" width="300" alt="Notifications">
+<table>
+  <tr>
+    <td><img src="media/notification.jpeg" width="300" alt="Notifications"></td>
+    <td><img src="media/email.jpeg" width="300" alt="Email Page"></td>
+  </tr>
+</table>
 
 ### Core Capabilities and Coverage
 The agent adapts its fetching strategy across four major Applicant Tracking Systems (ATS) and broad job board aggregators to provide a realistic market view.
@@ -54,8 +58,26 @@ The system manages job states in the `is_relevant` column using the following in
 2. Install required dependencies:
    pip install flet openai pydantic requests beautifulsoup4 python-jobspy
 
-3. Configure credentials:
-   Create an authorization.txt file in the root directory to store your OpenAI API key and Gmail App Password.
+3. Configure credentials: Create an authorization.txt file in the root directory and add the following lines, replacing the placeholders with your actual keys:
+
+```
+# --- EMAIL CONFIGURATION ---
+EMAIL_USER=name1@gmail.com
+EMAIL_PASS=XXXX XXXX XXXX XXXX
+RECIPIENT_EMAIL=name2@gmail.com
+
+# --- AI & API SETTINGS ---
+# Replace ENTER HERE with your actual sk- key
+OPENAI_API_KEY=ENTER HERE
+
+# --- APPLICATION TOGGLES ---
+AUTO_SCAN_ENABLED=False
+AI_ENABLED=False
+FILTER_ENABLED=True
+
+# --- SYSTEM DATA ---
+LAST_SCAN_TIME=Never
+```
 
 ## Execution
 To launch the application dashboard, run the following command from the root directory:
