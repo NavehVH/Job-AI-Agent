@@ -44,56 +44,141 @@ def main(page: ft.Page):
 
     def create_job_card(job, is_new):
         found_display = get_time_ago(job.get('found_at', ''))
+        
+        # --- NEW: Tech Tag Logic ---
+        tech_badges = []
+        raw_tech = job.get('tech_stack', '')
+        if raw_tech:
+            # Split the string and clean up whitespace
+            tech_list = [t.strip() for t in raw_tech.split(",") if t.strip()]
+            for tech in tech_list[:4]: # Limit to 4 tags to keep it clean
+                tech_badges.append(
+                    ft.Container(
+                        content=ft.Text(tech, size=10, color=cfg.ACCENT_COLOR, weight="bold"),
+                        bgcolor=f"{cfg.ACCENT_COLOR}22", # 22 is hex for ~13% opacity
+                        padding=ft.padding.only(left=8, right=8, top=4, bottom=4),
+                        border_radius=10,
+                        border=ft.border.all(1, f"{cfg.ACCENT_COLOR}44")
+                    )
+                )
+
         return ft.Container(
             content=ft.Column([
                 ft.Row([
                     ft.Column([
                         ft.Text(job['title'], weight="bold", size=18, color="white", no_wrap=True),
-                        ft.Row([ft.Text(job['company'], color=cfg.ACCENT_COLOR, weight="w600"), ft.Text(" • "), ft.Text(job['location'], color="#B3B3B3")]),
+                        ft.Row([
+                            ft.Text(job['company'], color=cfg.ACCENT_COLOR, weight="w600"), 
+                            ft.Text(" • "), 
+                            ft.Text(job['location'], color="#B3B3B3")
+                        ]),
                     ], expand=True),
-                    ft.Container(content=ft.Text("NEW", size=10, weight="bold", color="black"), bgcolor=cfg.ACCENT_COLOR, padding=5, border_radius=5, visible=is_new)
+                    ft.Container(
+                        content=ft.Text("NEW", size=10, weight="bold", color="black"), 
+                        bgcolor=cfg.ACCENT_COLOR, 
+                        padding=5, 
+                        border_radius=5, 
+                        visible=is_new
+                    )
                 ], alignment="spaceBetween"),
+                
+                # --- NEW: AI Reason Display ---
+                ft.Text(
+                    job.get('ai_reason', 'Analyzing requirements...'), 
+                    size=12, 
+                    color="#888888", 
+                    italic=True,
+                    max_lines=1,
+                    overflow=ft.TextOverflow.ELLIPSIS
+                ),
+
                 ft.Row([
-                    ft.Container(content=ft.Text("Junior", size=11, color="#B3B3B3"), bgcolor="#222222", padding=5, border_radius=15),
+                    # Dynamic Tech Badges Row
+                    ft.Row(tech_badges, spacing=8),
+                    
                     ft.Row([
                         ft.Text(f"Found {found_display}", size=11, color="#6A6A6A"),
-                        ft.IconButton(icon=ft.Icons.OPEN_IN_NEW, icon_color=cfg.ACCENT_COLOR, icon_size=18, on_click=lambda _: page.launch_url(job['url']))
+                        ft.IconButton(
+                            icon=ft.Icons.OPEN_IN_NEW, 
+                            icon_color=cfg.ACCENT_COLOR, 
+                            icon_size=18, 
+                            on_click=lambda _: page.launch_url(job['url'])
+                        )
                     ], spacing=10)
                 ], alignment="spaceBetween")
             ], spacing=12),
-            padding=20, bgcolor=cfg.CARD_BG, border_radius=15, border=ft.border.all(1, "#222222"),
-            on_hover=lambda e: (setattr(e.control, "bgcolor", "#1A1A1A" if e.data == "true" else cfg.CARD_BG), setattr(e.control, "border", ft.border.all(1, cfg.ACCENT_COLOR if e.data == "true" else "#222222")), e.control.update())
+            padding=20, 
+            bgcolor=cfg.CARD_BG, 
+            border_radius=15, 
+            border=ft.border.all(1, "#222222"),
+            on_hover=lambda e: (
+                setattr(e.control, "bgcolor", "#1A1A1A" if e.data == "true" else cfg.CARD_BG), 
+                setattr(e.control, "border", ft.border.all(1, cfg.ACCENT_COLOR if e.data == "true" else "#222222")), 
+                e.control.update()
+            )
         )
 
     def load_jobs_from_db():
         job_list.controls.clear()
         cursor = storage.conn.cursor()
-        q_count = "SELECT COUNT(*) FROM jobs"
-        if state["search"]:
-            cursor.execute(q_count + " WHERE title LIKE ? OR company LIKE ?", (f"%{state['search']}%", f"%{state['search']}%"))
-        else: cursor.execute(q_count)
-        total_pages = max(1, math.ceil(cursor.fetchone()[0] / cfg.RESULTS_PER_PAGE))
         
-        cursor.execute("SELECT MAX(found_at) FROM jobs")
-        max_ts_row = cursor.fetchone()
-        max_time = datetime.datetime.strptime(max_ts_row[0], '%Y-%m-%d %H:%M:%S') if max_ts_row and max_ts_row[0] else None
-
-        offset = state["current_page"] * cfg.RESULTS_PER_PAGE
-        q = "SELECT company, title, location, url, found_at FROM jobs "
+        # 1. BASE FILTER: We only want relevant jobs
+        base_filter = "WHERE is_relevant = 1"
+        
+        # 2. GET TOTAL COUNT (for pagination)
+        q_count = f"SELECT COUNT(*) FROM jobs {base_filter}"
         if state["search"]:
-            q += "WHERE title LIKE ? OR company LIKE ? ORDER BY found_at DESC LIMIT ? OFFSET ?"
+            cursor.execute(q_count + " AND (title LIKE ? OR company LIKE ?)", (f"%{state['search']}%", f"%{state['search']}%"))
+        else: 
+            cursor.execute(q_count)
+            
+        total_count = cursor.fetchone()[0]
+        total_pages = max(1, math.ceil(total_count / cfg.RESULTS_PER_PAGE))
+        
+        # 3. GET MAX TIME (for "NEW" badge logic)
+        # We define max_time here so it is available for the loop below
+        cursor.execute(f"SELECT MAX(found_at) FROM jobs {base_filter}")
+        max_ts_row = cursor.fetchone()
+        max_time = None
+        if max_ts_row and max_ts_row[0]:
+            try:
+                max_time = datetime.datetime.strptime(max_ts_row[0], '%Y-%m-%d %H:%M:%S')
+            except:
+                max_time = None
+
+        # 4. FETCH THE JOBS
+        offset = state["current_page"] * cfg.RESULTS_PER_PAGE
+        q = f"SELECT company, title, location, url, found_at, ai_reason, tech_stack FROM jobs {base_filter} "
+        
+        if state["search"]:
+            q += "AND (title LIKE ? OR company LIKE ?) ORDER BY found_at DESC LIMIT ? OFFSET ?"
             cursor.execute(q, (f"%{state['search']}%", f"%{state['search']}%", cfg.RESULTS_PER_PAGE, offset))
         else:
             q += "ORDER BY found_at DESC LIMIT ? OFFSET ?"
             cursor.execute(q, (cfg.RESULTS_PER_PAGE, offset))
         
+        # 5. RENDER THE CARDS
         for r in cursor.fetchall():
-            job_time = datetime.datetime.strptime(r[4], '%Y-%m-%d %H:%M:%S')
-            is_new = (max_time and (max_time - job_time).total_seconds() < 900)
-            job_list.controls.append(create_job_card({"company": r[0], "title": r[1], "location": r[2], "url": r[3], "found_at": r[4]}, is_new))
+            job_time_str = r[4]
+            is_new = False
+            if max_time and job_time_str:
+                try:
+                    job_time = datetime.datetime.strptime(job_time_str, '%Y-%m-%d %H:%M:%S')
+                    # If job was found within 15 minutes of the last scan
+                    is_new = (max_time - job_time).total_seconds() < 900
+                except:
+                    pass
+            
+            job_data = {
+                "company": r[0], "title": r[1], "location": r[2], 
+                "url": r[3], "found_at": r[4], "ai_reason": r[5], "tech_stack": r[6]
+            }
+            job_list.controls.append(create_job_card(job_data, is_new))
         
+        # Update Pagination UI
         page_number_text.value = f"Page {state['current_page'] + 1} of {total_pages}"
-        prev_btn.disabled = (state["current_page"] == 0); next_btn.disabled = (state["current_page"] + 1 >= total_pages)
+        prev_btn.disabled = (state["current_page"] == 0)
+        next_btn.disabled = (state["current_page"] + 1 >= total_pages)
         page.update()
 
     def change_page(delta):
