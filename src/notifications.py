@@ -4,14 +4,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 def get_auth_value(key_name):
-    """Flexible helper to read specific keys from authorization.txt"""
     try:
         if not os.path.exists("authorization.txt"):
             print(f"[!] Error: authorization.txt not found in {os.getcwd()}")
             return None
         with open("authorization.txt", "r") as f:
             for line in f:
-                # Ignore empty lines or lines without '='
                 if "=" in line:
                     k, v = line.split("=", 1)
                     if k.strip() == key_name:
@@ -24,7 +22,6 @@ def send_job_email(new_jobs, recipient_email="navehhadas@gmail.com"):
     if not new_jobs:
         return
 
-    # 1. Fetch Credentials using the helper
     sender_email = get_auth_value("EMAIL_USER")
     app_password = get_auth_value("EMAIL_PASS")
 
@@ -35,7 +32,6 @@ def send_job_email(new_jobs, recipient_email="navehhadas@gmail.com"):
     count = len(new_jobs)
     subject = f"Job Agent: Found {count} New Jobs"
     
-    # --- CONSTRUCT EMAIL BODY ---
     body = f"Job Agent found {count} new opportunities for you.\n\n"
     body += "Quick List:\n"
     for job in new_jobs:

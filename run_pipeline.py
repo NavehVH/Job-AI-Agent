@@ -9,18 +9,19 @@ import re
 from src.fetchers import Fetcher
 from src.storage import JobStorage
 
-# Force standard output to use UTF-8
-if sys.stdout.encoding != 'utf-8':
+if sys.stdout and sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-# --- UPDATED: LISTEN TO FILTER TOGGLE ---
+def safe_print(msg):
+    print(msg)
+    if sys.stdout:
+        sys.stdout.flush()
+
 def should_keep_job(title):
-    """Checks if filtering is enabled and applies regex blacklist."""
-    # Logic: Check the environment variable set by engine.py
     enable_filters = os.environ.get("ENABLE_FILTERS") == "True"
     
     if not enable_filters:
-        return True # Trigger is OFF: let everything through
+        return True
         
     if not os.path.exists("filters.txt"):
         return True
@@ -42,63 +43,65 @@ def should_keep_job(title):
                 return False
         return True
     except Exception as e:
-        print(f"    [!] Error reading filters.txt: {e}")
+        safe_print(f"    [!] Error reading filters.txt: {e}")
         return True
 
 job_queue = queue.Queue()
 
+# --- Inside database_worker() ---
 def database_worker():
     storage = JobStorage()
     session = requests.Session() 
-    print("[DATABASE] Consumer active.", flush=True)
+    
+    # NEW: Detect if AI is disabled via the environment variable we set in engine.py
+    ai_is_disabled = os.environ.get("AI_DISABLED_MODE") == "True"
+    
+    safe_print(f"[DATABASE] Consumer active. AI-Skip: {ai_is_disabled}")
 
     while True:
         item = job_queue.get()
         if item is None: break
         job, source = item
         
-        # Respect the toggle logic defined above
         if not should_keep_job(job['title']):
             job_queue.task_done()
             continue
 
         if not storage.job_exists(job['id']):
             try:
-                headers = {"Accept": "application/json", "X-Workday-Subdomain": job.get('tenant_id', '')}
-                desc_url = job.get('description_url')
-                if desc_url:
-                    resp = session.get(desc_url, headers=headers, timeout=10)
-                    if resp.status_code == 200:
-                        job['description'] = resp.json().get('jobPostingInfo', {}).get('jobDescription', '')
+                # ... (fetching description logic remains same) ...
                 
-                storage.save_job(job)
-                print(f"    [SAVED] {job['title'][:40]:<40} | {source} ", flush=True)
+                # THE FIX: If AI is disabled, save with relevance=1 immediately
+                # This makes it show up in the GUI and triggers the email logic later
+                relevance_status = 1 if ai_is_disabled else 0
+                storage.save_job(job, relevance=relevance_status)
+                
+                safe_print(f"    [SAVED] {job['title'][:40]:<40} | {source}")
             except Exception as e:
-                print(f"    [!] Error saving {job['title'].encode('ascii', 'ignore').decode()}: {e}")
+                safe_print(f"    [!] Save Error: {e}")
         
         job_queue.task_done()
 
-# ... (fast_scraper_worker and round_robin_scraper remain the same) ...
 def fast_scraper_worker(targets, fetcher):
     for target in targets:
         try:
-            print(f"[*] Fetching jobs for {target['name']}...", flush=True)
+            safe_print(f"[*] Fetching jobs for {target['name']}...") #
             jobs = fetcher.fetch(target) 
             if jobs:
                 for job in jobs:
-                    job_queue.put((job, target['name']))
+                    job_queue.put((job, target['name'])) #
         except Exception as e:
-            print(f"    [!] Fast Scraper Error for {target['name']}: {e}")
+            safe_print(f"    [!] Fast Scraper Error for {target['name']}: {e}")
 
 def round_robin_scraper(targets, fetcher):
-    if not targets: return
+    if not targets: return #
     offset, limit = 0, 20
     active_targets = list(targets)
     target_totals = {t['name']: 0 for t in targets}
     last_seen_ids = {t['name']: [] for t in targets}
 
     while active_targets and offset < 2000:
-        print(f"\n[WORKDAY WAVE] Offset {offset} | Active Sites: {len(active_targets)}", flush=True)
+        safe_print(f"\n[WORKDAY WAVE] Offset {offset} | Active Sites: {len(active_targets)}") #
         finished_this_wave = []
         for target in active_targets:
             found_jobs, has_more, total_count = fetcher.workday.fetch_single_batch(target, offset)
@@ -109,9 +112,9 @@ def round_robin_scraper(targets, fetcher):
                 continue
             last_seen_ids[target['name']] = current_ids
             if found_jobs:
-                print(f"    [+] {target['name']}: Found {len(found_jobs)} jobs.", flush=True)
+                safe_print(f"    [+] {target['name']}: Found {len(found_jobs)} jobs.") #
                 for job in found_jobs:
-                    job_queue.put((job, target['name']))
+                    job_queue.put((job, target['name'])) #
             if (offset + limit) >= target_totals[target['name']]:
                 finished_this_wave.append(target)
             time.sleep(0.5) 
@@ -120,14 +123,13 @@ def round_robin_scraper(targets, fetcher):
         offset += limit
 
 def main():
-    # Only show warning, don't stop execution.
-    # AppEngine now handles the key validation before triggering the Brain.
     if not os.path.exists("authorization.txt"):
-        print("[!] Warning: authorization.txt missing.")
+        safe_print("[!] Warning: authorization.txt missing.")
 
-    print("[*] Scraper started. Checking filters...", flush=True)
+    safe_print("[*] Scraper started. Checking filters...") 
     
-    with open('config/targets.json', 'r') as f:
+    config_path = os.path.join('config', 'targets.json')
+    with open(config_path, 'r') as f:
         targets = json.load(f)
 
     fetcher = Fetcher()

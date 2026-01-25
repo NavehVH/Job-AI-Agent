@@ -67,74 +67,92 @@ class AppEngine:
             self.pipeline_process.terminate()
 
     def run_pipeline(self, log_callback, finish_callback):
-        """Starts the scraper, runs AI analysis, then sends notifications."""
+        """Executes the scraper and handles the post-processing logic."""
         try:
-            # Load current toggle states from authorization.txt
+            # Refresh toggle states from the authorization file
             self.ai_enabled = self.get_auth_value("AI_ENABLED") == "True"
             self.filter_enabled = self.get_auth_value("FILTER_ENABLED") == "True"
 
+            # Prepare the environment variables for the child process
             env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8"
-            
-            # Pass the filter setting to the scraper via environment variable
             env["ENABLE_FILTERS"] = "True" if self.filter_enabled else "False"
+            
+            # THE FIX: Tell the scraper if AI is OFF so it can auto-approve jobs
+            env["AI_DISABLED_MODE"] = "True" if not self.ai_enabled else "False"
 
+            # Hide the black terminal window on Windows platforms
             startupinfo = None
             if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = 0 
 
+            # Start the scraper process using the bundled Python executable
             self.pipeline_process = subprocess.Popen(
-                ["python", "-u", "run_pipeline.py"], 
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, encoding='utf-8', errors='replace',
-                env=env, bufsize=1
+                [sys.executable, "-u", "run_pipeline.py"],
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT,
+                text=True, 
+                encoding='utf-8', 
+                errors='replace',
+                env=env, 
+                bufsize=1,
+                startupinfo=startupinfo
             )
 
-            # This loop already handles printing scraper logs to the console
+            # Read the scraper output in real-time
             while True:
                 line = self.pipeline_process.stdout.readline()
-                if not line: break
+                if not line:
+                    break
                 clean_line = line.strip()
-                print(clean_line) 
-                sys.stdout.flush()
+                
+                # Use your existing dual logging style, but with EXE crash protection
+                if sys.stdout:
+                    print(clean_line) 
+                    try:
+                        sys.stdout.flush()
+                    except:
+                        pass
+                
                 log_callback(clean_line)
 
-            self.pipeline_process.wait() 
+            # Wait for the scraper to finish
+            self.pipeline_process.wait()
             
+            # Record the scan time
             finish_ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             self.save_auth_value("LAST_SCAN_TIME", finish_ts)
             
-            # --- UPDATED MESSAGING LOGIC ---
+            # --- POST-PROCESSING LOGIC ---
             if self.pipeline_process.returncode == 0:
                 if self.ai_enabled:
-                    # Only check for key if AI is on
+                    # Run AI Brain Analysis if the toggle is ON
                     if self.get_auth_value("OPENAI_API_KEY"):
-                        # Ensure run_ai_analysis ALSO has prints inside it
                         self.run_ai_analysis(log_callback)
                     else:
                         msg = "SYSTEM: AI enabled but API Key is missing in authorization.txt"
-                        print(msg) # Shows in VS Code
-                        log_callback(msg) # Shows in GUI
+                        if sys.stdout: print(msg)
+                        log_callback(msg)
                 else:
-                    msg = "SYSTEM: AI Processing is disabled. Skipping analysis."
-                    print(msg) # Shows in VS Code
-                    log_callback(msg) # Shows in GUI
+                    # Logic when AI is OFF: Scraper already marked jobs as relevant
+                    msg = "SYSTEM: AI Processing is OFF. Jobs automatically approved for Feed."
+                    if sys.stdout: print(msg)
+                    log_callback(msg)
 
+            # Always check for email notifications if the run was successful
             if self.email_enabled and self.pipeline_process.returncode == 0:
                 self.check_and_send_notifications()
                 
-            # --- ADD THIS HERE ---
-            # Now it truly means everything is finished
             final_msg = "\n--- ALL SYSTEMS COMPLETE ---"
-            print(final_msg)
+            if sys.stdout: print(final_msg)
             log_callback(final_msg)
 
         except Exception as e:
             err_msg = f"SYSTEM ERROR: {repr(e)}"
-            print(err_msg) # Shows in VS Code
-            log_callback(err_msg) # Shows in GUI
+            if sys.stdout: print(err_msg)
+            log_callback(err_msg)
         finally:
             self.is_running = False
             finish_callback()

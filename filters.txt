@@ -1,5 +1,6 @@
 # --- Seniority & Leadership (To find Junior roles) ---
 senior
+Senior
 sr.
 staff
 principal
@@ -50,7 +51,6 @@ technician
 helpdesk
 ux
 ui
-creative
 mechanical
 physicist
 it support
@@ -87,7 +87,6 @@ customer success
 technical support
 
 # --- Hardware & VLSI (Chip Design) ---
-silicon
 ic digital
 dft # Design for Test
 vlsi
