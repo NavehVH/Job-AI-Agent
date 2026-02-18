@@ -17,6 +17,7 @@ def safe_print(msg):
     if sys.stdout:
         sys.stdout.flush()
 
+# Use filter on the job it finds
 def should_keep_job(title):
     enable_filters = os.environ.get("ENABLE_FILTERS") == "True"
     
@@ -48,12 +49,10 @@ def should_keep_job(title):
 
 job_queue = queue.Queue()
 
-# --- Inside database_worker() ---
+# Database Worker (Add the job if it should when a new one pop)
 def database_worker():
     storage = JobStorage()
     session = requests.Session() 
-    
-    # NEW: Detect if AI is disabled via the environment variable we set in engine.py
     ai_is_disabled = os.environ.get("AI_DISABLED_MODE") == "True"
     
     safe_print(f"[DATABASE] Consumer active. AI-Skip: {ai_is_disabled}")
@@ -69,31 +68,29 @@ def database_worker():
 
         if not storage.job_exists(job['id']):
             try:
-                # ... (fetching description logic remains same) ...
-                
-                # THE FIX: If AI is disabled, save with relevance=1 immediately
-                # This makes it show up in the GUI and triggers the email logic later
                 relevance_status = 1 if ai_is_disabled else 0
                 storage.save_job(job, relevance=relevance_status)
                 
-                safe_print(f"    [SAVED] {job['title'][:40]:<40} | {source}")
+                safe_print(f"[SAVED] {job['title'][:40]:<40} | {source}")
             except Exception as e:
-                safe_print(f"    [!] Save Error: {e}")
+                safe_print(f"[!] Save Error: {e}")
         
         job_queue.task_done()
 
+# scarper for fast scarping, which deliver all the data instant
 def fast_scraper_worker(targets, fetcher):
     for target in targets:
         try:
-            safe_print(f"[*] Fetching jobs for {target['name']}...") #
+            safe_print(f"[*] Fetching jobs for {target['name']}...") 
             jobs = fetcher.fetch(target) 
             if jobs:
                 for job in jobs:
-                    job_queue.put((job, target['name'])) #
+                    job_queue.put((job, target['name']))
         except Exception as e:
-            safe_print(f"    [!] Fast Scraper Error for {target['name']}: {e}")
+            safe_print(f"[!] Fast Scraper Error for {target['name']}: {e}")
 
-def round_robin_scraper(targets, fetcher):
+# scraper for slow scraping, like workday
+def round_robin_scraper_worker(targets, fetcher):
     if not targets: return #
     offset, limit = 0, 20
     active_targets = list(targets)
@@ -132,6 +129,7 @@ def main():
     with open(config_path, 'r') as f:
         targets = json.load(f)
 
+    # define which scarper to which worker
     fetcher = Fetcher()
     workday_targets = [t for t in targets if t.get('type') == 'workday']
     fast_targets = [t for t in targets if t.get('type') not in ['workday', 'jobspy']]
@@ -140,7 +138,7 @@ def main():
     consumer.start()
 
     threads = [
-        threading.Thread(target=round_robin_scraper, args=(workday_targets, fetcher)),
+        threading.Thread(target=round_robin_scraper_worker, args=(workday_targets, fetcher)),
         threading.Thread(target=fast_scraper_worker, args=(fast_targets, fetcher))
     ]
 
