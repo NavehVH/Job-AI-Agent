@@ -1,3 +1,8 @@
+
+# ==============================================================================
+# Handles the GUI styling and making it function
+# ==============================================================================
+
 import flet as ft
 import datetime, sqlite3, math, threading, time
 from src.storage import JobStorage

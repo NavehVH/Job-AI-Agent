@@ -1,3 +1,10 @@
+
+
+# ==============================================================================
+# Handles the pipeline flow
+# Scrape > Filter > DB Save > AI Brain > Email Notifications
+# ==============================================================================
+
 import json
 import time 
 import threading
@@ -8,6 +15,8 @@ import sys, io
 import re
 from src.fetchers import Fetcher
 from src.storage import JobStorage
+from src.notifications import send_job_email
+
 
 if sys.stdout and sys.stdout.encoding != 'utf-8':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -17,7 +26,7 @@ def safe_print(msg):
     if sys.stdout:
         sys.stdout.flush()
 
-# Use filter on the job it finds
+# Use filter on the jobs it finds
 def should_keep_job(title):
     enable_filters = os.environ.get("ENABLE_FILTERS") == "True"
     
@@ -77,7 +86,7 @@ def database_worker():
         
         job_queue.task_done()
 
-# scarper for fast scarping, which deliver all the data instant
+# Scarper Wroker for fast scarping, which deliver all the data instant
 def fast_scraper_worker(targets, fetcher):
     for target in targets:
         try:
@@ -89,7 +98,7 @@ def fast_scraper_worker(targets, fetcher):
         except Exception as e:
             safe_print(f"[!] Fast Scraper Error for {target['name']}: {e}")
 
-# scraper for slow scraping, like workday
+# Scraper Worker for slow scraping, like workday
 def round_robin_scraper_worker(targets, fetcher):
     if not targets: return #
     offset, limit = 0, 20
@@ -118,6 +127,65 @@ def round_robin_scraper_worker(targets, fetcher):
         for t in finished_this_wave:
             if t in active_targets: active_targets.remove(t)
         offset += limit
+        
+# Handles AI run if enabled and email notifications 
+def run_AI_processing():
+    storage = JobStorage()
+    ai_enabled = os.environ.get("AI_DISABLED_MODE") != "True"
+    email_enabled = os.environ.get("EMAIL_ENABLED") == "True"
+    
+    # AI BRAIN ANALYSIS
+    if ai_enabled:
+        safe_print("[*] Starting AI Brain Analysis...")
+        brain = JobBrain()
+        
+        # Look for jobs added in this session (e.g., last 15 minutes)
+        time_threshold = (datetime.datetime.now(datetime.timezone.utc) - 
+                          datetime.timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Get all jobs with relevant = 0
+        cursor = storage.conn.cursor()
+        cursor.execute("""
+            SELECT id, title, description FROM jobs 
+            WHERE is_relevant = 0 AND found_at > ?
+        """, (time_threshold,))
+        
+        pending_jobs = cursor.fetchall()
+        for j_id, title, desc in pending_jobs:
+            analysis = brain.analyze(title, desc or "") #AI brain
+            if analysis:
+                status = 1 if analysis.is_relevant else -1
+                cursor.execute("""
+                    UPDATE jobs SET is_relevant = ?, ai_reason = ?, 
+                    tech_stack = ?, years_required = ? WHERE id = ?
+                """, (status, analysis.reason, ", ".join(analysis.tech_stack), 
+                      analysis.years_required, j_id))
+                storage.conn.commit()
+                safe_print(f"  [{'RELEVANT' if status == 1 else 'SKIPPED'}] {title[:30]}")
+  
+# EMAIL NOTIFICATIONS              
+def send_notifications():
+    storage = JobStorage()
+    ai_enabled = os.environ.get("AI_DISABLED_MODE") != "True"
+    email_enabled = os.environ.get("EMAIL_ENABLED") == "True"
+    
+    if email_enabled:
+        safe_print("[*] Checking for notifications...")
+        cursor = storage.conn.cursor()
+        cursor.execute("""
+            SELECT company, title, location, url, found_at 
+            FROM jobs WHERE sent_email = 0 AND is_relevant = 1
+        """)
+        newly_found = [
+            {"company": r[0], "title": r[1], "location": r[2], "url": r[3], "found_at": r[4]} 
+            for r in cursor.fetchall()
+        ]
+        
+        if newly_found:
+            recipient = os.environ.get("RECIPIENT_EMAIL", "navehhadas@gmail.com")
+            send_job_email(newly_found, recipient)
+            cursor.execute("UPDATE jobs SET sent_email = 1 WHERE sent_email = 0 AND is_relevant = 1")
+            storage.conn.commit()
 
 def main():
     if not os.path.exists("authorization.txt"):
@@ -148,6 +216,12 @@ def main():
     job_queue.join()
     job_queue.put(None)
     consumer.join()
+
+    safe_print("\n[*] Scraper finished. Starting post-processing...")
+    # Handles AI brain and email notifications
+    run_AI_processing()
+    send_notifications()
+    safe_print("[*] Pipeline Complete.")
 
 if __name__ == "__main__":
     main()

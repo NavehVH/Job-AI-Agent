@@ -1,3 +1,8 @@
+
+# ==============================================================================
+# Handles definition how the Open AI behaves and its output
+# ==============================================================================
+
 from openai import OpenAI
 from pydantic import BaseModel, Field
 import os
@@ -13,7 +18,6 @@ class JobBrain:
     def __init__(self):
         self.api_key = self._load_api_key()
         if not self.api_key:
-            # We don't want to crash the whole app if the key is missing
             self.client = None
         else:
             self.client = OpenAI(api_key=self.api_key)

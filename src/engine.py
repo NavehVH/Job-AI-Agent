@@ -1,3 +1,9 @@
+
+# ==============================================================================
+# Handles the application GUI actions
+# ==============================================================================
+
+
 import subprocess, os, threading, time, datetime, sys
 from src.notifications import send_job_email
 
@@ -17,7 +23,6 @@ class AppEngine:
         self.email_enabled = True
 
     def get_auth_value(self, key_name):
-        """Reads settings from authorization.txt."""
         try:
             if not os.path.exists("authorization.txt"): return None
             with open("authorization.txt", "r") as f:
@@ -67,28 +72,28 @@ class AppEngine:
             self.pipeline_process.terminate()
 
     def run_pipeline(self, log_callback, finish_callback):
-        """Executes the scraper and handles the post-processing logic."""
+        """Executes the self-contained scraper pipeline and logs all output."""
         try:
-            # Refresh toggle states from the authorization file
+            # Refresh settings from the authorization file
             self.ai_enabled = self.get_auth_value("AI_ENABLED") == "True"
             self.filter_enabled = self.get_auth_value("FILTER_ENABLED") == "True"
 
-            # Prepare the environment variables for the child process
+            # Prepare environment variables for the pipeline process
             env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8"
             env["ENABLE_FILTERS"] = "True" if self.filter_enabled else "False"
-            
-            # THE FIX: Tell the scraper if AI is OFF so it can auto-approve jobs
             env["AI_DISABLED_MODE"] = "True" if not self.ai_enabled else "False"
+            env["EMAIL_ENABLED"] = "True" if self.email_enabled else "False"
+            env["RECIPIENT_EMAIL"] = self.user_email
 
-            # Hide the black terminal window on Windows platforms
+            # 3. Prevent black terminal window on Windows
             startupinfo = None
             if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
                 startupinfo.wShowWindow = 0 
 
-            # Start the scraper process using the bundled Python executable
+            # 4. Launch the consolidated pipeline
             self.pipeline_process = subprocess.Popen(
                 [sys.executable, "-u", "run_pipeline.py"],
                 stdout=subprocess.PIPE, 
@@ -101,53 +106,29 @@ class AppEngine:
                 startupinfo=startupinfo
             )
 
-            # Read the scraper output in real-time
+            # 5. Continuous log reading
             while True:
                 line = self.pipeline_process.stdout.readline()
                 if not line:
                     break
                 clean_line = line.strip()
                 
-                # Use your existing dual logging style, but with EXE crash protection
                 if sys.stdout:
-                    print(clean_line) 
                     try:
+                        print(clean_line)
                         sys.stdout.flush()
                     except:
                         pass
                 
                 log_callback(clean_line)
 
-            # Wait for the scraper to finish
             self.pipeline_process.wait()
             
-            # Record the scan time
-            finish_ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            self.save_auth_value("LAST_SCAN_TIME", finish_ts)
-            
-            # --- POST-PROCESSING LOGIC ---
             if self.pipeline_process.returncode == 0:
-                if self.ai_enabled:
-                    # Run AI Brain Analysis if the toggle is ON
-                    if self.get_auth_value("OPENAI_API_KEY"):
-                        self.run_ai_analysis(log_callback)
-                    else:
-                        msg = "SYSTEM: AI enabled but API Key is missing in authorization.txt"
-                        if sys.stdout: print(msg)
-                        log_callback(msg)
-                else:
-                    # Logic when AI is OFF: Scraper already marked jobs as relevant
-                    msg = "SYSTEM: AI Processing is OFF. Jobs automatically approved for Feed."
-                    if sys.stdout: print(msg)
-                    log_callback(msg)
-
-            # Always check for email notifications if the run was successful
-            if self.email_enabled and self.pipeline_process.returncode == 0:
-                self.check_and_send_notifications()
-                
-            final_msg = "\n--- ALL SYSTEMS COMPLETE ---"
-            if sys.stdout: print(final_msg)
-            log_callback(final_msg)
+                finish_ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                self.save_auth_value("LAST_SCAN_TIME", finish_ts)
+            else:
+                log_callback(f"SYSTEM: Pipeline exited with error code {self.pipeline_process.returncode}")
 
         except Exception as e:
             err_msg = f"SYSTEM ERROR: {repr(e)}"
@@ -161,83 +142,3 @@ class AppEngine:
         """Retrieves the scan heartbeat."""
         val = self.get_auth_value("LAST_SCAN_TIME")
         return val if val else "Never"
-
-    def run_ai_analysis(self, log_callback):
-        from src.brain import JobBrain
-        brain = JobBrain()
-        
-        self.storage.conn.commit()
-        cursor = self.storage.conn.cursor()
-        
-        # FIX: Use utcnow() so it matches the UTC timestamps in the DB
-        now_utc = datetime.datetime.now(datetime.timezone.utc)
-        time_threshold = (now_utc - datetime.timedelta(minutes=20)).strftime('%Y-%m-%d %H:%M:%S')
-        
-        msg = "[*] Starting AI Brain Analysis..."
-        print(msg)
-        log_callback(msg)
-        
-        # DIAGNOSTIC: Check if any unprocessed jobs exist at all before the time filter
-        cursor.execute("SELECT COUNT(*) FROM jobs WHERE is_relevant = 0")
-        total_unprocessed = cursor.fetchone()[0]
-        
-        # The actual filtered query
-        cursor.execute("""
-            SELECT id, title, description 
-            FROM jobs 
-            WHERE is_relevant = 0 AND found_at > ?
-        """, (time_threshold,))
-        
-        pending_jobs = cursor.fetchall()
-        
-        if not pending_jobs:
-            msg = f"AI: Found {total_unprocessed} total pending jobs, but 0 within the 20m window."
-            print(msg)
-            log_callback(msg)
-            return
-
-        for j_id, title, desc in pending_jobs:
-            analysis = brain.analyze(title, desc or "")
-            if analysis:
-                status = 1 if analysis.is_relevant else -1
-                
-                # Update specific AI columns in the database
-                cursor.execute("""
-                    UPDATE jobs SET 
-                        is_relevant = ?, 
-                        ai_reason = ?, 
-                        tech_stack = ?,
-                        years_required = ?
-                    WHERE id = ?
-                """, (
-                    status, 
-                    analysis.reason, 
-                    ", ".join(analysis.tech_stack), 
-                    analysis.years_required,
-                    j_id
-                ))
-                self.storage.conn.commit()
-                
-                # Formulate the result log
-                log_line = f"  {'RELEVANT' if status == 1 else 'SKIPPED'}: {title[:30]}"
-                print(log_line) # <--- THIS PRINT SHOWS IN VS CODE
-                log_callback(log_line)
-                
-    def check_and_send_notifications(self):
-        """Processes only AI-approved jobs for email alerts."""
-        self.storage.conn.commit()
-        cursor = self.storage.conn.cursor()
-        
-        # Only select jobs that are RELEVANT (1) and haven't been emailed yet (0)
-        cursor.execute("""
-            SELECT company, title, location, url, found_at 
-            FROM jobs 
-            WHERE sent_email = 0 AND is_relevant = 1
-        """)
-        newly_found = [{"company": r[0], "title": r[1], "location": r[2], "url": r[3], "found_at": r[4]} for r in cursor.fetchall()]
-        
-        if newly_found:
-            send_job_email(newly_found, self.user_email)
-            # Mark these specific jobs as sent
-            cursor.execute("UPDATE jobs SET sent_email = 1 WHERE sent_email = 0 AND is_relevant = 1")
-            self.storage.conn.commit()

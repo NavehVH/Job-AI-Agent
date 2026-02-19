@@ -1,3 +1,8 @@
+
+# ==============================================================================
+# Handles the SMTP email sending to a specific email
+# ==============================================================================
+
 import smtplib
 import os
 from email.mime.text import MIMEText
