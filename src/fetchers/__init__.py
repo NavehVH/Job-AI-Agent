@@ -4,6 +4,7 @@ from .greenhouse import GreenhouseFetcher
 from .comeet import ComeetFetcher
 from .lever import LeverFetcher
 from .jobspy_aggr import JobSpyFetcher
+from .generic import GenericHTMLFetcher
 
 class Fetcher:
     def __init__(self):
@@ -14,12 +15,16 @@ class Fetcher:
         self.comeet = ComeetFetcher()
         self.lever = LeverFetcher()
         self.jobspy = JobSpyFetcher()
+        self.generic = GenericHTMLFetcher()
 
     def fetch(self, target_config):
         """Your original full-crawl logic"""
         fetcher_type = target_config.get('type')
         
-        if fetcher_type == 'workday':
+        # FIX: Ensure we use target_config consistently
+        if fetcher_type == 'generic': 
+            return self.generic.fetch(target_config)  
+        elif fetcher_type == 'workday':
             return self.workday.fetch(target_config)
         elif fetcher_type == 'smartrecruiters':
             return self.smartrecruiters.fetch(target_config)
@@ -40,9 +45,8 @@ class Fetcher:
         fetcher_type = target_config.get('type')
         
         if fetcher_type == 'workday':
-            # This calls the new function we added to workday.py
+            # This calls the specialized function in workday.py
             return self.workday.fetch_single_batch(target_config, offset)
         
-        # For now, other types return empty because we haven't 
-        # written batch logic for them yet.
-        return [], False
+        # Other types currently don't use the round-robin/batch logic
+        return [], False, 0

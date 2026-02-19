@@ -13,6 +13,9 @@ import requests
 import os
 import sys, io
 import re
+import datetime
+from src.brain import JobBrain
+from src.fetchers import Fetcher
 from src.fetchers import Fetcher
 from src.storage import JobStorage
 from src.notifications import send_job_email
