@@ -1,108 +1,177 @@
-import requests
 import time
-import re
+from typing import Dict, List
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, urljoin
+import requests
 from bs4 import BeautifulSoup
-from .base import BaseFetcher
+from src.fetchers.base import BaseFetcher
 
 class GenericHTMLFetcher(BaseFetcher):
-    def fetch(self, target_config):
-        name = target_config.get('name', 'Unknown')
-        print(f"[*] Fetching jobs for {name} (Hybrid Generic)...")
+    def fetch(self, target_config: Dict) -> List[Dict]:
+        name = target_config.get("name", "Unknown")
+        render = target_config.get("render", False)
+        print(f"[*] Fetching jobs for {name} (Ultimate Hybrid Engine)...")
+
+        if not render:
+            return self._fetch_requests(target_config)
+        else:
+            return self._fetch_selenium(target_config)
+
+    def _fetch_requests(self, target_config: Dict) -> List[Dict]:
+        name = target_config.get("name", "Unknown")
+        url = target_config["url"]
+        pagination = target_config.get("pagination", {})
         
-        url = target_config['url']
-        all_jobs = []
-        page_source = ""
+        session = requests.Session()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        }
+        
+        param = pagination.get("param", "start")
+        start_val = pagination.get("start", 0)
+        step = pagination.get("step", 10)
+        max_pages = pagination.get("max_pages", 5)
+        
+        jobs = []
+        seen_ids = set()
 
+        # 
+        for page_idx in range(max_pages):
+            offset = start_val + (page_idx * step)
+            page_url = self._set_query_param(url, param, offset)
+            
+            try:
+                resp = session.get(page_url, headers=headers, timeout=20)
+                if resp.status_code != 200: break
+                
+                soup = BeautifulSoup(resp.text, "html.parser")
+                page_jobs = self._parse_jobs(soup, target_config, name, resp.url)
+                
+                new_jobs = [j for j in page_jobs if j["id"] not in seen_ids]
+                if not new_jobs: break
+                
+                for j in new_jobs: seen_ids.add(j["id"])
+                jobs.extend(new_jobs)
+                
+                print(f"    -> {name} Index {offset}: Found {len(new_jobs)} NEW jobs.")
+                time.sleep(1)
+            except Exception as e:
+                print(f"    [!] Error: {e}")
+                break
+                
+        return jobs
+
+    def _fetch_selenium(self, target_config: Dict) -> List[Dict]:
+        name = target_config.get("name", "Unknown")
+        url = target_config["url"]
+        
+        from selenium import webdriver
+        from selenium.webdriver.chrome.options import Options
+        from selenium.webdriver.chrome.service import Service
+        from selenium.webdriver.common.by import By
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from webdriver_manager.chrome import ChromeDriverManager
+        
+        options = Options()
+        options.add_argument("--headless=new")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+        })
+
+        jobs = []
+        seen_ids = set()
+        
         try:
-            # --- PHASE 1: GET SOURCE ---
-            if target_config.get('render', False):
-                from selenium import webdriver
-                from selenium.webdriver.chrome.options import Options
-                from selenium.webdriver.chrome.service import Service
-                from webdriver_manager.chrome import ChromeDriverManager
-                
-                options = Options()
-                options.add_argument("--headless=new")
-                ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-                options.add_argument(f"user-agent={ua}")
-                options.add_experimental_option('excludeSwitches', ['enable-logging'])
-                
-                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-                driver.get(url)
-                time.sleep(target_config.get('render_sleep', 8))
-                page_source = driver.page_source
-                driver.quit()
-            else:
-                session = requests.Session()
-                headers = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,webp,*/*;q=0.8",
-                    "Referer": "https://www.google.com/",
-                    "Connection": "keep-alive"
-                }
-                response = session.get(url, headers=headers, timeout=20)
-                page_source = response.text
-
-            # --- PHASE 2: PARSE ---
-            soup = BeautifulSoup(page_source, 'html.parser')
-            row_selector = target_config.get('row_selector')
-            items = soup.select(row_selector) if row_selector else []
+            driver.get(url)
+            page_count = 1
+            max_pages = target_config.get("pagination", {}).get("max_pages", 4)
             
-            if not items:
-                items = soup.find_all('a', href=re.compile(r'joborderid=|job_id=|posting/|/position/', re.I))
-                link_mode = True
-            else:
-                link_mode = False
-
-            print(f"    -> Identified {len(items)} items")
-
-            for item in items:
+            # 
+            while page_count <= max_pages:
                 try:
-                    if link_mode:
-                        title = item.get_text(strip=True)
-                        link = item['href']
-                    else:
-                        # 1. Try specific title selector first
-                        title_sel = target_config.get('title_selector')
-                        title_elem = item.select_one(title_sel) if title_sel else None
-                        
-                        # 2. Try specific link selector
-                        link_sel = target_config.get('link_selector')
-                        link_elem = item.select_one(link_sel) if link_sel else item.find('a', href=True)
-
-                        if not link_elem: continue
-                        link = link_elem['href']
-                        
-                        # 3. Smart Title logic: If title_elem is junk or missing, find better text in the row
-                        title = title_elem.get_text(strip=True) if title_elem else ""
-                        blacklist = ["whatsapp", "share", "copy link", "save job", "facebook", "linkedin", "browse positions"]
-                        
-                        if not title or any(word in title.lower() for word in blacklist):
-                            # Fallback: Look for any child element with decent text that isn't blacklisted
-                            potential_titles = [t.get_text(strip=True) for t in item.find_all(['p', 'span', 'h3', 'a']) 
-                                               if len(t.get_text(strip=True)) > 5 
-                                               and not any(word in t.get_text(strip=True).lower() for word in blacklist)]
-                            if potential_titles:
-                                title = potential_titles[0]
-                            else:
-                                continue
-
-                    # Construct Absolute URL
-                    base = target_config.get('base_url', '').rstrip('/')
-                    if link and not link.startswith('http'):
-                        link = f"{base}/{link.lstrip('/')}"
-
-                    all_jobs.append({
-                        "company": name, 
-                        "title": title, 
-                        "location": "Israel",
-                        "url": link, 
-                        "id": link, 
-                        "posted_on": "Recent"
-                    })
-                except: continue
-                    
-        except Exception as e:
-            print(f"    [!] Error for {name}: {e}")
+                    WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.CSS_SELECTOR, target_config['row_selector'])))
+                except: break
+                
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
+                time.sleep(3)
+                
+                soup = BeautifulSoup(driver.page_source, "html.parser")
+                page_jobs = self._parse_jobs(soup, target_config, name, driver.current_url)
+                
+                new_jobs = [j for j in page_jobs if j["id"] not in seen_ids]
+                if not new_jobs: break
+                
+                for j in new_jobs: seen_ids.add(j["id"])
+                jobs.extend(new_jobs)
+                
+                print(f"    -> {name} Page {page_count}: Found {len(new_jobs)} NEW jobs.")
+                
+                next_sel = target_config.get("next_button_selector")
+                if next_sel:
+                    try:
+                        btn = driver.find_element(By.CSS_SELECTOR, next_sel)
+                        driver.execute_script("arguments[0].scrollIntoView();", btn)
+                        time.sleep(1)
+                        driver.execute_script("arguments[0].click();", btn)
+                        page_count += 1
+                        time.sleep(4)
+                    except: break
+                else: break
+        finally:
+            driver.quit()
             
-        return all_jobs
+        return jobs
+
+    def _parse_jobs(self, soup: BeautifulSoup, config: Dict, company: str, base_url: str) -> List[Dict]:
+        jobs = []
+        rows = soup.select(config.get("row_selector", ""))
+        
+        # If row selector fails, fallback to all links (Check Point needs this)
+        items = rows if rows else soup.select("a[href]")
+
+        includes = config.get("href_include", [])
+        # Hardcode social excludes so they never show up again
+        excludes = config.get("href_exclude", []) + ["mailto:", "twitter.com", "linkedin.com", "facebook.com", "share"]
+        
+        for item in items:
+            title_sel = config.get("title_selector")
+            t_el = item.select_one(title_sel) if title_sel and item.name != 'a' else item
+            
+            if item.name == 'a':
+                link = item.get("href", "")
+            else:
+                l_el = item.select_one("a[href]")
+                link = l_el.get("href", "") if l_el else ""
+
+            if not link: continue
+            
+            link_lower = link.lower()
+            if any(x in link_lower for x in excludes): continue
+            if includes and not any(x in link_lower for x in includes): continue
+
+            title = t_el.get_text(" ", strip=True) if t_el else ""
+            if not title or len(title) < 4: continue
+
+            if not link.startswith("http"):
+                link = urljoin(base_url, link)
+                
+            jobs.append({
+                "company": company, "title": title, "location": config.get("location", "Israel"),
+                "url": link, "id": link, "posted_on": "Recent"
+            })
+            
+        return jobs
+
+    def _set_query_param(self, url: str, param: str, value: int) -> str:
+        parsed = urlparse(url)
+        qs = parse_qs(parsed.query, keep_blank_values=True)
+        qs[param] = [str(value)]
+        new_query = urlencode(qs, doseq=True)
+        return urlunparse(parsed._replace(query=new_query))

@@ -2,19 +2,32 @@
   {
     "name": "Check Point",
     "type": "generic",
-    "url": "https://careers.checkpoint.com/index.php?q=&module=cpcareers&a=search&fa%5B%5D=country_ss%3AIsrael&sort=",
-    "base_url": "https://careers.checkpoint.com/",
+    "render": false,
+    "url": "https://careers.checkpoint.com/index.php?m=cpcareers&a=search&fa%5B%5D=country_ss%3AIsrael",
+    "location": "Israel",
     "row_selector": "table#resultsTable tbody tr",
-    "title_selector": "td.title-column a"
+    "title_selector": "a",
+    "href_include": ["joborderid="],
+    "pagination": {
+      "type": "url_param",
+      "param": "start",
+      "start": 0,
+      "step": 10,
+      "max_pages": 5
+    }
   },
   {
     "name": "Wix",
     "type": "generic",
-    "url": "https://careers.wix.com/positions?locations=tel-aviv%2Cbeer-sheva",
-    "base_url": "https://careers.wix.com",
     "render": true,
-    "render_sleep": 8,
+    "url": "https://careers.wix.com/positions?locations=tel-aviv%2Cbeer-sheva",
+    "location": "Israel",
     "row_selector": "div[id^='comp-mamdi4ys']",
-    "title_selector": "p.font_3"
+    "title_selector": "p.font_3",
+    "next_button_selector": "button[aria-label='Next']",
+    "href_include": ["/position/"],
+    "pagination": {
+      "max_pages": 4
+    }
   }
 ]
