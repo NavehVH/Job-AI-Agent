@@ -1,5 +1,23 @@
 [
   {
+    "name": "Google",
+    "type": "generic",
+    "render": true,
+    "url": "https://www.google.com/about/careers/applications/jobs/results?location=Israel",
+    "base_url": "https://www.google.com/about/careers/applications/",
+    "location": "Israel",
+    "row_selector": "li.lLd3Je",
+    "title_selector": "h3.QJPWVe",
+    "link_selector": "a.WpHeLc",
+    "href_include": [
+      "jobs/results/"
+    ],
+    "next_button_selector": "button[aria-label*='next' i], a[aria-label*='next' i]",
+    "pagination": {
+      "max_pages": 4
+    }
+  },
+  {
     "name": "Amazon",
     "type": "generic",
     "render": true,
@@ -9,7 +27,9 @@
     "row_selector": "div.job",
     "title_selector": "h3.job-title",
     "link_selector": "a.job-link",
-    "href_include": ["/en/jobs/"],
+    "href_include": [
+      "/en/jobs/"
+    ],
     "next_button_selector": "button[aria-label*='Next' i], button.next-button, a.next-button",
     "pagination": {
       "max_pages": 4
@@ -25,30 +45,14 @@
     "row_selector": "div[data-test-id='job-listing']",
     "title_selector": "div[class^='title']",
     "link_selector": "a[href^='/careers/job/']",
-    "href_include": ["/careers/job/"],
+    "href_include": [
+      "/careers/job/"
+    ],
     "next_button_selector": "button[aria-label*='Next' i], button[aria-label*='next' i], button.pagination-next",
     "pagination": {
       "max_pages": 4
     }
   },
-  {
-    "name": "Google",
-    "type": "generic",
-    "render": true,
-    "url": "https://www.google.com/about/careers/applications/jobs/results?location=Israel",
-    "base_url": "https://www.google.com/about/careers/applications/",
-    "location": "Israel",
-    "row_selector": "li.lLd3Je",
-    "title_selector": "h3.QJPWVe",
-    "link_selector": "a.WpHeLc",
-    "href_include": ["jobs/results/"],
-    "pagination": {
-      "type": "scroll",
-      "max_scrolls": 25,
-      "stable_rounds": 3,
-      "sleep_after_scroll": 2.0
-    }
-  }, 
   {
     "name": "Mobileye",
     "type": "generic",
