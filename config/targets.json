@@ -238,11 +238,6 @@
     "type": "greenhouse"
   },
   {
-    "name": "Redis",
-    "board_token": "redis",
-    "type": "greenhouse"
-  },
-  {
     "name": "BigID",
     "board_token": "bigid",
     "type": "greenhouse"
@@ -250,11 +245,6 @@
   {
     "name": "At-Bay",
     "board_token": "atbay",
-    "type": "greenhouse"
-  },
-  {
-    "name": "StreamElements",
-    "board_token": "streamelements",
     "type": "greenhouse"
   },
   {

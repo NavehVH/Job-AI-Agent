@@ -4,10 +4,24 @@
 # ==============================================================================
 
 import flet as ft
-import datetime, sqlite3, math, threading, time
+import datetime, sqlite3, math, threading, time, subprocess, os
 from src.storage import JobStorage
 from src.engine import AppEngine
 import src.config as cfg
+
+def open_url(url):
+    print(f"[GUI] Opening: {url}")
+    try:
+        env = os.environ.copy()
+        for cmd in (['gio', 'open', url], ['xdg-open', url]):
+            result = subprocess.run(cmd, env=env, timeout=5,
+                                    stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL)
+            if result.returncode == 0:
+                return
+    except Exception as e:
+        print(f"[GUI] URL open error: {e}")
 
 def main(page: ft.Page):
     # --- 1. SETUP ---
@@ -63,7 +77,7 @@ def main(page: ft.Page):
                         bgcolor=f"{cfg.ACCENT_COLOR}22", # 22 is hex for ~13% opacity
                         padding=ft.padding.only(left=8, right=8, top=4, bottom=4),
                         border_radius=10,
-                        border=ft.border.all(1, f"{cfg.ACCENT_COLOR}44")
+                        border=ft.Border.all(1, f"{cfg.ACCENT_COLOR}44")
                     )
                 )
 
@@ -94,10 +108,10 @@ def main(page: ft.Page):
                     ft.Row([
                         ft.Text(f"Found {found_display}", size=11, color="#6A6A6A"),
                         ft.IconButton(
-                            icon=ft.Icons.OPEN_IN_NEW, 
-                            icon_color=cfg.ACCENT_COLOR, 
-                            icon_size=18, 
-                            on_click=lambda _: page.launch_url(job['url'])
+                            icon=ft.Icons.OPEN_IN_NEW,
+                            icon_color=cfg.ACCENT_COLOR,
+                            icon_size=18,
+                            on_click=lambda _, url=job['url']: threading.Thread(target=open_url, args=(url,), daemon=True).start()
                         )
                     ], spacing=10)
                 ], alignment="spaceBetween")
@@ -105,10 +119,10 @@ def main(page: ft.Page):
             padding=20, 
             bgcolor=cfg.CARD_BG, 
             border_radius=15, 
-            border=ft.border.all(1, "#222222"),
+            border=ft.Border.all(1, "#222222"),
             on_hover=lambda e: (
-                setattr(e.control, "bgcolor", "#1A1A1A" if e.data == "true" else cfg.CARD_BG), 
-                setattr(e.control, "border", ft.border.all(1, cfg.ACCENT_COLOR if e.data == "true" else "#222222")), 
+                setattr(e.control, "bgcolor", "#1A1A1A" if e.data == "true" else cfg.CARD_BG),
+                setattr(e.control, "border", ft.Border.all(1, cfg.ACCENT_COLOR if e.data == "true" else "#222222")),
                 e.control.update()
             )
         )
@@ -216,7 +230,7 @@ def main(page: ft.Page):
     search_field = ft.TextField(hint_text="Search jobs...", border_radius=15, bgcolor=cfg.CARD_BG, on_change=lambda e: (state.update({"search": e.control.value, "current_page": 0}), load_jobs_from_db()))
     prev_btn = ft.IconButton(ft.Icons.ARROW_BACK_IOS_NEW, on_click=lambda _: change_page(-1))
     next_btn = ft.IconButton(ft.Icons.ARROW_FORWARD_IOS, on_click=lambda _: change_page(1))
-    run_button = ft.ElevatedButton("RUN JOB SEARCH", icon=ft.Icons.PLAY_ARROW, on_click=on_run_click, style=ft.ButtonStyle(bgcolor=cfg.ACCENT_COLOR, color="white", shape=ft.RoundedRectangleBorder(radius=8)))
+    run_button = ft.FilledButton("RUN JOB SEARCH", icon=ft.Icons.PLAY_ARROW, on_click=on_run_click, style=ft.ButtonStyle(bgcolor=cfg.ACCENT_COLOR, color="white", shape=ft.RoundedRectangleBorder(radius=8)))
 
     feed_view = ft.Column([ft.Container(search_field, padding=25), job_list, ft.Container(ft.Row([prev_btn, page_number_text, next_btn], alignment="center", spacing=20), padding=20)], expand=True)
     
@@ -320,8 +334,8 @@ def main(page: ft.Page):
         ], spacing=8), padding=15, bgcolor=cfg.CARD_BG, border_radius=12),
         feed_nav, settings_nav,
         # MARGIN FIX: Wrap text in Container
-        ft.Container(content=ft.Text("LIVE LOGS", size=10, color=cfg.TEXT_GREY, weight="bold"), margin=ft.margin.only(top=10)),
-        ft.Container(content=log_view, bgcolor="#000000", border_radius=10, height=200, border=ft.border.all(1, "#222222")),
+        ft.Container(content=ft.Text("LIVE LOGS", size=10, color=cfg.TEXT_GREY, weight="bold"), margin=ft.Margin.only(top=10)),
+        ft.Container(content=log_view, bgcolor="#000000", border_radius=10, height=200, border=ft.Border.all(1, "#222222")),
         ft.Container(expand=True), run_button
     ]), width=280, bgcolor=cfg.SIDEBAR_BG, padding=30)
 
@@ -337,4 +351,4 @@ def main(page: ft.Page):
     threading.Thread(target=auto_scan_loop, daemon=True).start()
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    ft.run(main)

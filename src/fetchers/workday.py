@@ -1,12 +1,5 @@
 import requests
 import time
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 from .base import BaseFetcher
 
 GLOBAL_SESSIONS = {} 
@@ -24,24 +17,33 @@ class WorkdayFetcher(BaseFetcher):
         return jobs
 
     def _get_selenium_handshake(self, url):
-        options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+        from playwright.sync_api import sync_playwright
         try:
-            driver.get(url)
-            WebDriverWait(driver, 25).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            time.sleep(7) 
-            session = requests.Session()
-            for c in driver.get_cookies():
-                session.cookies.set(c['name'], c['value'])
-            return session
+            with sync_playwright() as p:
+                browser = p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage"]
+                )
+                context = browser.new_context(
+                    user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+                )
+                page = context.new_page()
+                try:
+                    page.goto(url, wait_until="domcontentloaded", timeout=25000)
+                    page.wait_for_selector("body", timeout=25000)
+                    time.sleep(7)
+                    session = requests.Session()
+                    for c in context.cookies():
+                        session.cookies.set(c['name'], c['value'])
+                    return session
+                except Exception as e:
+                    print(f"    [!] Handshake failed: {e}")
+                    return None
+                finally:
+                    browser.close()
         except Exception as e:
-            print(f"    [!] Handshake failed: {e}")
+            print(f"    [!] Playwright launch failed: {e}")
             return None
-        finally:
-            driver.quit()
 
     def fetch_single_batch(self, target_config, offset):
         limit = 20

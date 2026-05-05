@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+playwright
+openai
+pydantic
+flet
+pandas
+python-jobspy
+python-dateutil
